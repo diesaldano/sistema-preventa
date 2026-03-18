@@ -1,6 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+/**
+ * POST /api/orders/[code]/deliver
+ * Staff en evento marca el pedido como entregado/redeemed
+ * 
+ * Requisitos:
+ * - Orden debe estar en estado PAID
+ * 
+ * Transición: PAID → REDEEMED (FINAL - no se puede cambiar después)
+ * 
+ * Response:
+ * - 200: Orden entregada, status=REDEEMED (final)
+ * - 404: Orden no encontrada
+ * - 400: Estado inválido o ya fue entregada
+ * - 500: Error del servidor
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
@@ -11,12 +26,22 @@ export async function POST(
 
     if (!order) {
       return NextResponse.json(
-        { error: 'Order not found' },
+        { error: 'Orden no encontrada' },
         { status: 404 }
       );
     }
 
-    // Solo puede redeemirse si está en PAID
+    // Verificar si ya fue entregada (REDEEMED es estado FINAL)
+    if (order.status === 'REDEEMED') {
+      return NextResponse.json(
+        {
+          error: '⚠️ Este pedido ya fue entregado. No se puede procesar nuevamente.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Solo puede entregarse si está en PAID
     if (order.status !== 'PAID') {
       return NextResponse.json(
         {
@@ -30,8 +55,9 @@ export async function POST(
     const updatedOrder = await db.order.updateStatus(code, 'REDEEMED');
 
     return NextResponse.json({
-      ...updatedOrder,
-      message: '✓ Pedido retirado exitosamente. REDEEMED (final)',
+      success: true,
+      message: '✓ Pedido entregado exitosamente. Estado: REDEEMED (final)',
+      data: updatedOrder,
     });
   } catch (error) {
     // Si es error de REDEEMED, dar mensaje especial
@@ -42,9 +68,9 @@ export async function POST(
       );
     }
 
-    console.error('Error redeeming order:', error);
+    console.error('Error delivering order:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to redeem order' },
+      { error: error instanceof Error ? error.message : 'Error al entregar pedido' },
       { status: 500 }
     );
   }

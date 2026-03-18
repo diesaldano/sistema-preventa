@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Estados del pedido
+enum OrderStatus {
+  PENDING_PAYMENT  // Esperando pago del usuario
+  PAYMENT_REVIEW   // Usuario pagó, admin revisa
+  PAID             // Admin confirmó, listo para retiro
+  REDEEMED         // Entregado en evento (FINAL e inmutable)
+  CANCELLED        // Rechazado (FINAL)
+}
+
+// Productos disponibles para comprar
+model Product {
+  id          Int       @id @default(autoincrement())
+  slug        String    @unique @db.VarChar(100)  // "cerveza-quilmes" para URLs
+  name        String
+  description String?
+  price       Int       // Precio en centavos (ej: 1500 = $15.00)
+  category    String    @db.VarChar(50)  // cerveza, fernet, combinado
+  stock       Int       @default(0)  // Cantidad disponible
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relaciones
+  items       OrderItem[]
+
+  @@index([category])
+  @@index([active])
+  @@map("products")
+}
+
+// Pedidos de compra
+model Order {
+  id                BigInt        @id @default(autoincrement())  // ID interno numérico
+  code              String        @unique @db.VarChar(20)  // ej: AR-5847 (público, visible al usuario)
+  customerName      String        @db.VarChar(150)
+  customerEmail     String        @db.VarChar(150)
+  customerPhone     String        @db.VarChar(20)
+  total             Int           // Total en centavos
+  status            OrderStatus   @default(PENDING_PAYMENT)
+  comprobante       String?       @db.Text  // base64 del archivo
+  comprobanteMime   String?       @db.VarChar(50)  // Tipo MIME
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  paidAt            DateTime?
+  deliveredAt       DateTime?
+
+  // Relaciones
+  items             OrderItem[]
+
+  // Índices para búsquedas rápidas
+  @@index([status])
+  @@index([customerEmail])
+  @@index([createdAt])
+  @@index([code])
+  @@map("orders")
+}
+
+// Items/productos dentro de cada pedido
+model OrderItem {
+  id        BigInt    @id @default(autoincrement())
+  orderId   BigInt    // Referencia al pedido
+  productId Int       // Referencia al producto
+  quantity  Int       @db.SmallInt
+  unitPrice Int       // Guardar precio en el momento de la compra
+  createdAt DateTime  @default(now())
+
+  // Relaciones
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, productId])
+  @@index([productId])
+  @@map("order_items")
+}

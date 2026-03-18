@@ -29,6 +29,8 @@ export type Order = {
   items: OrderItem[];
   total: number;
   status: OrderStatus;
+  comprobante?: string;  // Base64 or URL de comprobante
+  comprobanteMime?: string;  // MIME type (image/png, application/pdf, etc)
   createdAt: Date;
   updatedAt: Date;
 };

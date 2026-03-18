@@ -84,8 +84,8 @@ export default function AdminPage() {
     }
   }
 
-  const pendingOrders = orders.filter((o) => o.status === 'PENDING_VALIDATION');
-  const confirmadoOrders = orders.filter((o) => o.status === 'CONFIRMED');
+  const pendingOrders = orders.filter((o) => o.status === 'PAYMENT_REVIEW');
+  const confirmadoOrders = orders.filter((o) => o.status === 'PAID');
 
   return (
     <main className="min-h-screen bg-slate-950">

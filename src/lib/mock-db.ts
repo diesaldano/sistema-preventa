@@ -64,6 +64,13 @@ let products: Product[] = [
 /**
  * 📋 Mock Orders Database
  * Array en memoria que simula una BD
+ * 
+ * Flujo de estados:
+ * 1. PENDING_PAYMENT (inicial)
+ * 2. PAYMENT_REVIEW (usuario cargó comprobante, admin revisa)
+ * 3. PAID (admin validó, listo para retiro)
+ * 4. REDEEMED (entregado en evento - FINAL)
+ * O CANCELLED (rechazado en cualquier punto - FINAL)
  */
 let orders: Order[] = [];
 
@@ -199,19 +206,27 @@ export const ordersDB = {
 
   /**
    * UPDATE - Actualizar estado del pedido con validación de transiciones
+   * 
+   * Transiciones válidas:
+   * PENDING_PAYMENT → PAYMENT_REVIEW (usuario carga comprobante)
+   * PAYMENT_REVIEW → PAID (admin valida)
+   * PAYMENT_REVIEW → CANCELLED (admin rechaza)
+   * PAID → REDEEMED (staff entrega)
+   * PAYMENT_REVIEW → CANCELLED (admin rechaza en cualquier momento)
+   * PENDING_PAYMENT → CANCELLED (si nunca cargó comprobante)
    */
   updateStatus: (code: string, newStatus: string): Order | null => {
     const order = orders.find((o) => o.code === code);
     if (!order) return null;
 
-    // REGLA CRÍTICA: REDEEMED es final
+    // REGLA CRÍTICA: REDEEMED es FINAL (no puede cambiar)
     if (order.status === 'REDEEMED') {
-      throw new Error('❌ REDEEMED: Pedido ya entregado. No puede cambiar de estado.');
+      throw new Error('❌ REDEEMED es estado FINAL: Pedido ya entregado. No puede cambiar.');
     }
 
-    // REGLA: CANCELLED es final
+    // REGLA CRÍTICA: CANCELLED es FINAL (no puede cambiar)
     if (order.status === 'CANCELLED') {
-      throw new Error('❌ CANCELLED: Pedido rechazado. No puede cambiar de estado.');
+      throw new Error('❌ CANCELLED es estado FINAL: Pedido rechazado. No puede cambiar.');
     }
 
     // Validar transiciones permitidas
@@ -219,8 +234,8 @@ export const ordersDB = {
       'PENDING_PAYMENT': ['PAYMENT_REVIEW', 'CANCELLED'],
       'PAYMENT_REVIEW': ['PAID', 'CANCELLED'],
       'PAID': ['REDEEMED', 'CANCELLED'],
-      'REDEEMED': [],      // No puede cambiar
-      'CANCELLED': [],      // No puede cambiar
+      'REDEEMED': [],  // Final - no hay transiciones
+      'CANCELLED': [],  // Final - no hay transiciones
     };
 
     if (!validTransitions[order.status].includes(newStatus)) {
@@ -272,6 +287,41 @@ export const ordersDB = {
       totalRevenue: orders
         .filter((o) => o.status !== 'CANCELLED')
         .reduce((sum, o) => sum + o.total, 0),
+    };
+  },
+
+  /**
+   * UPLOAD - Cargar comprobante de pago
+   * Cambia estado de PENDING_PAYMENT → PAYMENT_REVIEW
+   */
+  uploadReceipt: (code: string, comprobante: string, comprobanteMime: string): Order | null => {
+    const order = orders.find((o) => o.code === code);
+    if (!order) return null;
+
+    // No permitir cargar comprobante en estados finales
+    if (order.status === 'REDEEMED' || order.status === 'CANCELLED') {
+      throw new Error(
+        `No se puede cargar comprobante en estado ${order.status}`
+      );
+    }
+
+    // Cargar comprobante y cambiar a PAYMENT_REVIEW
+    order.comprobante = comprobante;
+    order.comprobanteMime = comprobanteMime;
+    order.status = 'PAYMENT_REVIEW';
+    order.updatedAt = new Date();
+    return JSON.parse(JSON.stringify(order));
+  },
+
+  /**
+   * GET - Obtener comprobante
+   */
+  getReceipt: (code: string): { comprobante?: string; comprobanteMime?: string } | null => {
+    const order = orders.find((o) => o.code === code);
+    if (!order) return null;
+    return {
+      comprobante: order.comprobante,
+      comprobanteMime: order.comprobanteMime,
     };
   },
 

@@ -24,24 +24,25 @@ model Product {
 }
 
 model Order {
-  id             String       @id @default(cuid())
-  code           String       @unique
+  id                String       @id @default(cuid())
+  code              String       @unique
 
-  customerName   String
-  customerPhone  String
-  customerEmail  String
+  customerName      String
+  customerPhone     String
+  customerEmail     String
 
-  status         OrderStatus
+  status            OrderStatus
 
-  totalAmount    Int
-  proofImageUrl  String?
+  total             Int
+  comprobante       String?      // Comprobante de pago (base64)
+  comprobanteMime   String?      // MIME type del comprobante
 
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  paidAt         DateTime?
-  deliveredAt    DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  paidAt            DateTime?
+  deliveredAt       DateTime?
 
-  items          OrderItem[]
+  items             OrderItem[]
 }
 
 model OrderItem {
@@ -53,13 +54,16 @@ model OrderItem {
   quantity   Int
   unitPrice  Int
 
-  order      Order    @relation(fields: [orderId], references: [id])
-  product    Product  @relation(fields: [productId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, productId])
 }
 
 enum OrderStatus {
-  PENDING_VALIDATION
-  CONFIRMED
+  PENDING_PAYMENT
+  PAYMENT_REVIEW
+  PAID
+  REDEEMED
   CANCELLED
-  DELIVERED
 }

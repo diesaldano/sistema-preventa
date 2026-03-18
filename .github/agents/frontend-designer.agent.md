@@ -1,7 +1,6 @@
 ---
 name: frontend-designer
 description: "Frontend UI/UX specialist for layout improvements, component styling, Tailwind refactoring, responsive design fixes, visual polish and accessibility improvements"
-focus: "frontend"
 ---
 
 # 🎨 Frontend Designer Agent

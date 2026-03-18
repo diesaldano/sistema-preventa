@@ -25,7 +25,7 @@ export default function Home() {
     <main className="min-h-screen bg-slate-950">
       {/* Brand Header */}
       <BrandHeader 
-        event="Preventa DIVA ROCK 2025"
+        event="AUTOS ROBADOS DIVA ROCK 2026"
         subtitle="Preventa oficial de bebidas"
       />
 

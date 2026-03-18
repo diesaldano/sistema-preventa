@@ -1,7 +1,6 @@
 ---
 name: backend-architect
 description: "Use when: designing API endpoints, implementing business logic, defining order lifecycle, system architecture, validation flows, error handling, database structure, and backend organization. Backend architecture specialist for Preventa system."
-focus: "backend"
 ---
 
 # 🧠 Backend Architect Agent

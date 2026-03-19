@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { randomUUID } from "crypto";
 
 const prisma = new PrismaClient();
 
@@ -6,6 +7,7 @@ async function main() {
 
   const products = [
     {
+      id: randomUUID(),
       name: "Cerveza Quilmes",
       description: "Lata 473ml",
       price: 1500,
@@ -14,6 +16,7 @@ async function main() {
       stock: 200,
     },
     {
+        id: randomUUID(),
         name: "Cerveza Corona",
         description: "Lata 473ml",
         price: 1800,
@@ -22,6 +25,7 @@ async function main() {
         stock: 150,
       },
         {
+        id: randomUUID(),
         name: "Cerveza Heineken",
         description: "Lata 473ml",
         price: 1700,
@@ -30,6 +34,7 @@ async function main() {
         stock: 180,
         },
             {
+        id: randomUUID(),
         name: "Cerveza Stella Artois",
         description: "Lata 473ml",
         price: 1600,
@@ -43,7 +48,6 @@ async function main() {
     await prisma.product.create({
       data: {
         ...product,
-        slug: product.name.toLowerCase().replace(/\s/g, "-"),
       },
     });
   }

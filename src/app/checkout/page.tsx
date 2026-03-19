@@ -570,7 +570,7 @@ export default function CheckoutPage() {
                     </div>
                     <div className="border-t border-emerald-500/20 pt-3 flex justify-between font-bold text-base">
                       <span className="text-slate-100">TOTAL:</span>
-                      <span className="text-amber-400 font-medium text-lg">{formatPrice(order.total)}</span>
+                      <span className="text-amber-400 font-medium text-lg">{formatPrice(total)}</span>
                     </div>
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2 text-center font-medium text-amber-300">
                       Estado: PENDIENTE VALIDACIÓN

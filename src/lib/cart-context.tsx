@@ -59,11 +59,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  const removeItem = (productId: number) => {
+  const removeItem = (productId: string) => {
     setItems((prevItems) => prevItems.filter((item) => item.productId !== productId));
   };
 
-  const updateQuantity = (productId: number, quantity: number) => {
+  const updateQuantity = (productId: string, quantity: number) => {
     if (quantity <= 0) {
       removeItem(productId);
     } else {

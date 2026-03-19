@@ -1,6 +1,7 @@
 // Database functions using Prisma ORM
 
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { Product, Order, OrderStatus } from './types';
 
 // Singleton instance for Prisma Client
@@ -48,7 +49,7 @@ export const db = {
       }));
     },
 
-    findUnique: async (id: number) => {
+    findUnique: async (id: string) => {
       const product = await prisma.product.findUnique({ where: { id } });
       if (!product) return null;
       return {
@@ -95,7 +96,7 @@ export const db = {
     create: async (data: Product) => {
       const product = await prisma.product.create({
         data: {
-          slug: generateSlug(data.name),
+          id: randomUUID(),
           name: data.name,
           description: data.description,
           price: data.price,
@@ -114,10 +115,9 @@ export const db = {
       };
     },
 
-    update: async (id: number, data: Partial<Product>) => {
+    update: async (id: string, data: Partial<Product>) => {
       const updateData: any = {};
       if (data.name) {
-        updateData.slug = generateSlug(data.name);
         updateData.name = data.name;
       }
       if (data.description !== undefined) updateData.description = data.description;
@@ -140,12 +140,12 @@ export const db = {
       };
     },
 
-    delete: async (id: number) => {
+    delete: async (id: string) => {
       await prisma.product.delete({ where: { id } });
       return true;
     },
 
-    updateStock: async (id: number, quantity: number) => {
+    updateStock: async (id: string, quantity: number) => {
       const product = await prisma.product.update({
         where: { id },
         data: {
@@ -379,15 +379,7 @@ export const db = {
     },
 
     delete: async (code: string) => {
-      // Primero obtener la orden para conocer su ID
-      const order = await prisma.order.findUnique({ where: { code } });
-      if (!order) return false;
-      
-      // Eliminar items relacionados usando el ID numérico
-      await prisma.orderItem.deleteMany({
-        where: { orderId: order.id },
-      });
-      // Luego eliminar la orden
+      // Gracias a onDelete: Cascade en Prisma, al eliminar la orden se eliminan automáticamente los items
       await prisma.order.delete({ where: { code } });
       return true;
     },

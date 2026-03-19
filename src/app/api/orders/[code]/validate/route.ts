@@ -46,11 +46,7 @@ export async function POST(
     // El comprobante es OPCIONAL - se puede validar sin él
     const updatedOrder = await db.order.updateStatus(code, 'PAID');
 
-    return NextResponse.json({
-      success: true,
-      message: '✓ Pago validado. Pedido listo para retiro en evento.',
-      data: updatedOrder,
-    });
+    return NextResponse.json(updatedOrder);
   } catch (error) {
     console.error('Error validating order:', error);
     return NextResponse.json(

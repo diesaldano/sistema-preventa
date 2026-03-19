@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/lib/cart-context';
+import { useTheme } from '@/lib/theme-context';
 import { formatPrice } from '@/lib/utils';
 import CheckoutStepper from '@/components/checkout-stepper';
 import { AlertCircle, Upload, X, CheckCircle } from 'lucide-react';
@@ -25,6 +26,8 @@ const STEPS = [
 export default function CheckoutPage() {
   const router = useRouter();
   const { items, total, clearCart } = useCart();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -43,15 +46,27 @@ export default function CheckoutPage() {
 
   if (items.length === 0) {
     return (
-      <main className="min-h-screen bg-slate-950">
+      <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
         <BrandHeader event="Carrito Vacío" subtitle="Preventa oficial de bebidas" />
         <div className="mx-auto max-w-3xl px-6 py-12">
-          <section className="w-full rounded-lg border border-slate-800 bg-slate-900 p-8 text-center">
-            <h2 className="text-2xl font-semibold text-slate-100">Tu carrito está vacío</h2>
-            <p className="mt-2 text-slate-400">Debes agregar productos antes de continuar</p>
+          <section className={`w-full rounded-lg border p-8 text-center transition-colors ${
+            isDark
+              ? 'border-slate-800 bg-slate-900'
+              : 'border-slate-200 bg-slate-50'
+          }`}>
+            <h2 className={`text-2xl font-semibold ${
+              isDark ? 'text-slate-100' : 'text-slate-900'
+            }`}>Tu carrito está vacío</h2>
+            <p className={`mt-2 ${
+              isDark ? 'text-slate-400' : 'text-slate-600'
+            }`}>Debes agregar productos antes de continuar</p>
             <Link
               href="/"
-              className="mt-6 inline-flex items-center justify-center rounded-lg bg-amber-500 hover:bg-amber-600 px-6 py-2 text-sm font-semibold text-slate-950 transition"
+              className={`mt-6 inline-flex items-center justify-center rounded-lg px-6 py-2 text-sm font-semibold transition ${
+                isDark
+                  ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
             >
               Volver a la Tienda
             </Link>
@@ -164,7 +179,7 @@ export default function CheckoutPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
       <BrandHeader event="Completa tu Pedido" subtitle="Preventa oficial de bebidas" />
 
       <div className="mx-auto max-w-4xl px-6 py-12">
@@ -180,10 +195,20 @@ export default function CheckoutPage() {
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
             {currentStep === 1 && (
-              <div className="rounded-lg border border-slate-800 bg-slate-900 p-8">
-                <h2 className="mb-2 text-xl font-semibold text-slate-100">Tus Datos de Contacto</h2>
-                <div className="mb-6 border-b border-slate-800 pb-4">
-                  <div className="h-1 w-24 bg-amber-500 rounded" />
+              <div className={`rounded-lg border p-8 transition-colors ${
+                isDark
+                  ? 'border-slate-800 bg-slate-900'
+                  : 'border-slate-200 bg-white'
+              }`}>
+                <h2 className={`mb-2 text-xl font-semibold ${
+                  isDark ? 'text-slate-100' : 'text-slate-900'
+                }`}>Tus Datos de Contacto</h2>
+                <div className={`mb-6 border-b pb-4 ${
+                  isDark ? 'border-slate-800' : 'border-slate-200'
+                }`}>
+                  <div className={`h-1 w-24 rounded ${
+                    isDark ? 'bg-slate-700' : 'bg-blue-600'
+                  }`} />
                 </div>
                 <form className="space-y-5">
                   <div>
@@ -195,7 +220,11 @@ export default function CheckoutPage() {
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="Juan Rodriguez"
-                      className="w-full px-4 py-2 border border-slate-800 bg-slate-800/50 rounded-lg text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+                        isDark
+                          ? 'border-slate-800 bg-slate-800/50 text-slate-100 placeholder:text-slate-500 focus:ring-slate-700'
+                          : 'border-slate-300 bg-slate-50 text-slate-900 placeholder:text-slate-500 focus:ring-blue-600'
+                      }`}
                     />
                   </div>
                   <div>
@@ -205,7 +234,11 @@ export default function CheckoutPage() {
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="juan@example.com"
-                      className="w-full px-4 py-2 border border-slate-800 bg-slate-800/50 rounded-lg text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+                        isDark
+                          ? 'border-slate-800 bg-slate-800/50 text-slate-100 placeholder:text-slate-500 focus:ring-slate-700'
+                          : 'border-slate-300 bg-slate-50 text-slate-900 placeholder:text-slate-500 focus:ring-blue-600'
+                      }`}
                     />
                   </div>
                   <div>
@@ -215,7 +248,11 @@ export default function CheckoutPage() {
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       placeholder="+54911234567"
-                      className="w-full px-4 py-2 border border-slate-800 bg-slate-800/50 rounded-lg text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+                        isDark
+                          ? 'border-slate-800 bg-slate-800/50 text-slate-100 placeholder:text-slate-500 focus:ring-slate-700'
+                          : 'border-slate-300 bg-slate-50 text-slate-900 placeholder:text-slate-500 focus:ring-blue-600'
+                      }`}
                     />
                   </div>
                 </form>
@@ -223,7 +260,7 @@ export default function CheckoutPage() {
                   <button
                     onClick={handleNextStep}
                     disabled={!isStep1Valid}
-                    className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 px-6 py-2 text-sm font-semibold text-slate-950 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 rounded-lg bg-slate-800 hover:bg-slate-700 px-6 py-2 text-sm font-semibold text-white transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Continuar →
                   </button>
@@ -232,37 +269,69 @@ export default function CheckoutPage() {
             )}
 
             {currentStep === 2 && (
-              <div className="rounded-lg border border-slate-800 bg-slate-900 p-8 space-y-6">
+              <div className={`rounded-lg border p-8 space-y-6 transition-colors ${
+                isDark
+                  ? 'border-slate-800 bg-slate-900'
+                  : 'border-slate-200 bg-white'
+              }`}>
                 <div>
-                  <h2 className="mb-2 text-xl font-semibold text-slate-100">
+                  <h2 className={`mb-2 text-xl font-semibold ${
+                    isDark ? 'text-slate-100' : 'text-slate-900'
+                  }`}>
                     Realiza tu Transferencia Bancaria
                   </h2>
-                  <div className="mb-6 border-b border-slate-800 pb-4">
-                    <div className="h-1 w-24 bg-amber-500 rounded" />
+                  <div className={`mb-6 border-b pb-4 ${
+                    isDark ? 'border-slate-800' : 'border-slate-200'
+                  }`}>
+                    <div className={`h-1 w-24 rounded ${
+                      isDark ? 'bg-slate-700' : 'bg-blue-600'
+                    }`} />
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-200 mb-3">Transferir A:</p>
-                  <div className="rounded-lg border border-slate-800 bg-slate-800/40 p-4 space-y-2 font-mono text-sm">
+                  <p className={`text-sm font-medium mb-3 ${
+                    isDark ? 'text-slate-200' : 'text-slate-700'
+                  }`}>Transferir A:</p>
+                  <div className={`rounded-lg border p-4 space-y-2 font-mono text-sm transition-colors ${
+                    isDark
+                      ? 'border-slate-800 bg-slate-800/40'
+                      : 'border-slate-300 bg-slate-100'
+                  }`}>
                     <div>
-                      <span className="text-slate-400">Alias:</span>{' '}
-                      <span className="font-semibold text-slate-100">{BANK_DATA.alias}</span>
+                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Alias:</span>{' '}
+                      <span className={`font-semibold ${
+                        isDark ? 'text-slate-100' : 'text-slate-900'
+                      }`}>{BANK_DATA.alias}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400">CBU:</span>{' '}
-                      <span className="font-semibold text-slate-100 break-all">{BANK_DATA.cbu}</span>
+                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>CBU:</span>{' '}
+                      <span className={`font-semibold break-all ${
+                        isDark ? 'text-slate-100' : 'text-slate-900'
+                      }`}>{BANK_DATA.cbu}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400">Banco:</span>{' '}
-                      <span className="font-semibold text-slate-100">{BANK_DATA.bank}</span>
+                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Banco:</span>{' '}
+                      <span className={`font-semibold ${
+                        isDark ? 'text-slate-100' : 'text-slate-900'
+                      }`}>{BANK_DATA.bank}</span>
                     </div>
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-200 mb-3">Monto Exacto:</p>
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
-                    <div className="text-2xl font-bold text-amber-400">{formatPrice(total)}</div>
-                    <div className="flex gap-2 text-xs text-amber-300">
+                  <p className={`text-sm font-medium mb-3 ${
+                    isDark ? 'text-slate-200' : 'text-slate-700'
+                  }`}>Monto Exacto:</p>
+                  <div className={`rounded-lg border p-4 space-y-2 transition-colors ${
+                    isDark
+                      ? 'border-blue-500/30 bg-blue-500/10'
+                      : 'border-blue-300 bg-blue-100/50'
+                  }`}>
+                    <div className={`text-2xl font-bold ${
+                      isDark ? 'text-blue-400' : 'text-blue-600'
+                    }`}>{formatPrice(total)}</div>
+                    <div className={`flex gap-2 text-xs ${
+                      isDark ? 'text-blue-300' : 'text-blue-700'
+                    }`}>
                       <AlertCircle size={16} className="flex-shrink-0" />
                       <p>
                         <strong>IMPORTANTE:</strong> Transferir el monto EXACTO para validar tu
@@ -272,32 +341,50 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-200 mb-3">Tu Pedido:</p>
-                  <div className="rounded-lg border border-slate-800 bg-slate-800/40 p-4 space-y-2 text-sm">
+                  <p className={`text-sm font-medium mb-3 ${
+                    isDark ? 'text-slate-200' : 'text-slate-700'
+                  }`}>Tu Pedido:</p>
+                  <div className={`rounded-lg border p-4 space-y-2 text-sm transition-colors ${
+                    isDark
+                      ? 'border-slate-800 bg-slate-800/40'
+                      : 'border-slate-300 bg-slate-100'
+                  }`}>
                     {items.map((item) => (
                       <div key={item.productId} className="flex justify-between">
-                        <span className="text-slate-300">{item.quantity}x {item.name}</span>
-                        <span className="font-medium text-slate-100">
+                        <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{item.quantity}x {item.name}</span>
+                        <span className={`font-medium ${
+                          isDark ? 'text-slate-100' : 'text-slate-900'
+                        }`}>
                           {formatPrice(item.price * item.quantity)}
                         </span>
                       </div>
                     ))}
-                    <div className="border-t border-slate-800 pt-2 flex justify-between font-semibold">
-                      <span className="text-slate-100">TOTAL:</span>
-                      <span className="text-amber-400">{formatPrice(total)}</span>
+                    <div className={`border-t pt-2 flex justify-between font-semibold ${
+                      isDark ? 'border-slate-800' : 'border-slate-300'
+                    }`}>
+                      <span className={isDark ? 'text-slate-100' : 'text-slate-900'}>TOTAL:</span>
+                      <span className={isDark ? 'text-blue-400' : 'text-blue-600'}>{formatPrice(total)}</span>
                     </div>
                   </div>
                 </div>
                 <div className="flex justify-between pt-4">
                   <button
                     onClick={handlePreviousStep}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-800/50 hover:bg-slate-800 px-6 py-2 text-sm font-medium text-slate-200 transition"
+                    className={`inline-flex items-center gap-2 rounded-lg border px-6 py-2 text-sm font-medium transition ${
+                      isDark
+                        ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800 text-slate-200'
+                        : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
                   >
                     ← Atrás
                   </button>
                   <button
                     onClick={handleNextStep}
-                    className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 px-6 py-2 text-sm font-semibold text-slate-950 transition"
+                    className={`inline-flex items-center gap-2 rounded-lg px-6 py-2 text-sm font-semibold transition ${
+                      isDark
+                        ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
                   >
                     Ya Transferí →
                   </button>
@@ -306,16 +393,28 @@ export default function CheckoutPage() {
             )}
 
             {currentStep === 3 && (
-              <div className="rounded-lg border border-slate-800 bg-slate-900 p-8 space-y-6">
+              <div className={`rounded-lg border p-8 space-y-6 transition-colors ${
+                isDark
+                  ? 'border-slate-800 bg-slate-900'
+                  : 'border-slate-200 bg-white'
+              }`}>
                 <div>
-                  <h2 className="mb-2 text-xl font-semibold text-slate-100">
+                  <h2 className={`mb-2 text-xl font-semibold ${
+                    isDark ? 'text-slate-100' : 'text-slate-900'
+                  }`}>
                     Subir Comprobante (Opcional)
                   </h2>
-                  <div className="mb-6 border-b border-slate-800 pb-4">
-                    <div className="h-1 w-24 bg-amber-500 rounded" />
+                  <div className={`mb-6 border-b pb-4 ${
+                    isDark ? 'border-slate-800' : 'border-slate-200'
+                  }`}>
+                    <div className={`h-1 w-24 rounded ${
+                      isDark ? 'bg-slate-700' : 'bg-blue-600'
+                    }`} />
                   </div>
                 </div>
-                <p className="text-sm text-slate-400">
+                <p className={`text-sm ${
+                  isDark ? 'text-slate-400' : 'text-slate-600'
+                }`}>
                   Para mayor seguridad, puedes subir el comprobante de tu transferencia. Esto
                   ayuda a validar tu pago.
                 </p>
@@ -325,29 +424,51 @@ export default function CheckoutPage() {
                       onClick={() => fileInputRef.current?.click()}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={handleDragDrop}
-                      className="rounded-lg border-2 border-dashed border-amber-500/50 bg-amber-500/5 p-8 text-center cursor-pointer transition hover:bg-amber-500/10"
+                      className={`rounded-lg border-2 border-dashed p-8 text-center cursor-pointer transition ${
+                        isDark
+                          ? 'border-blue-500/50 bg-blue-500/5 hover:bg-blue-500/10'
+                          : 'border-blue-400/50 bg-blue-100/30 hover:bg-blue-100/50'
+                      }`}
                     >
-                      <Upload className="mx-auto mb-3 text-amber-500" size={32} />
-                      <p className="font-medium text-slate-100">DRAG & DROP aquí</p>
-                      <p className="text-sm text-slate-400 mt-1">o</p>
+                      <Upload className={`mx-auto mb-3 ${
+                        isDark ? 'text-blue-500' : 'text-blue-600'
+                      }`} size={32} />
+                      <p className={`font-medium ${
+                        isDark ? 'text-slate-100' : 'text-slate-900'
+                      }`}>DRAG & DROP aquí</p>
+                      <p className={`text-sm mt-1 ${
+                        isDark ? 'text-slate-400' : 'text-slate-600'
+                      }`}>o</p>
                     </div>
                     <div className="text-center">
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-800/50 hover:bg-slate-800 px-6 py-2 text-sm font-medium text-slate-200 transition"
+                        className={`inline-flex items-center gap-2 rounded-lg border px-6 py-2 text-sm font-medium transition ${
+                          isDark
+                            ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800 text-slate-200'
+                            : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
                       >
                         Seleccionar archivo
                       </button>
                     </div>
                   </>
                 ) : (
-                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 flex items-center justify-between">
+                  <div className={`rounded-lg border p-4 flex items-center justify-between transition-colors ${
+                    isDark
+                      ? 'border-emerald-500/30 bg-emerald-500/10'
+                      : 'border-emerald-300 bg-emerald-100/50'
+                  }`}>
                     <div className="flex items-center gap-3">
-                      <CheckCircle className="text-emerald-400" size={24} />
+                      <CheckCircle className={isDark ? 'text-emerald-400' : 'text-emerald-600'} size={24} />
                       <div>
-                        <p className="font-medium text-slate-100">{uploadedFile.name}</p>
-                        <p className="text-xs text-slate-400">
+                        <p className={`font-medium ${
+                          isDark ? 'text-slate-100' : 'text-slate-900'
+                        }`}>{uploadedFile.name}</p>
+                        <p className={`text-xs ${
+                          isDark ? 'text-slate-400' : 'text-slate-600'
+                        }`}>
                           {(uploadedFile.size / 1024).toFixed(2)} KB
                         </p>
                       </div>
@@ -357,13 +478,15 @@ export default function CheckoutPage() {
                         setUploadedFile(null);
                         setPreviewUrl(null);
                       }}
-                      className="text-red-400 hover:text-red-300"
+                      className={isDark ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'}
                     >
                       <X size={20} />
                     </button>
                   </div>
                 )}
-                <p className="text-xs text-slate-400">Formatos: JPG, PNG, PDF (máx 5MB)</p>
+                <p className={`text-xs ${
+                  isDark ? 'text-slate-400' : 'text-slate-600'
+                }`}>Formatos: JPG, PNG, PDF (máx 5MB)</p>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -378,14 +501,22 @@ export default function CheckoutPage() {
                 <div className="flex justify-between pt-4">
                   <button
                     onClick={handlePreviousStep}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-800/50 hover:bg-slate-800 px-6 py-2 text-sm font-medium text-slate-200 transition"
+                    className={`inline-flex items-center gap-2 rounded-lg border px-6 py-2 text-sm font-medium transition ${
+                      isDark
+                        ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800 text-slate-200'
+                        : 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
                   >
                     ← Atrás
                   </button>
                   <button
                     onClick={handleNextStep}
                     disabled={loading}
-                    className="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 px-6 py-2 text-sm font-semibold text-slate-950 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`inline-flex items-center gap-2 rounded-lg px-6 py-2 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                      isDark
+                        ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
                   >
                     {loading ? 'Procesando...' : 'Confirmar Pedido →'}
                   </button>
@@ -439,7 +570,7 @@ export default function CheckoutPage() {
                     </div>
                     <div className="border-t border-emerald-500/20 pt-3 flex justify-between font-bold text-base">
                       <span className="text-slate-100">TOTAL:</span>
-                      <span className="text-amber-400">{formatPrice(total)}</span>
+                      <span className="text-amber-400 font-medium text-lg">{formatPrice(order.total)}</span>
                     </div>
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2 text-center font-medium text-amber-300">
                       Estado: PENDIENTE VALIDACIÓN
@@ -480,21 +611,33 @@ export default function CheckoutPage() {
           </div>
 
           <div className="lg:col-span-1">
-            <div className="sticky top-6 rounded-lg border border-slate-800 bg-slate-900 p-6">
-              <h3 className="font-semibold text-slate-100 mb-4">Resumen de tu Compra</h3>
-              <div className="space-y-3 mb-4 pb-4 border-b border-slate-800">
+            <div className={`sticky top-6 rounded-lg border p-6 transition-colors ${
+              isDark
+                ? 'border-slate-800 bg-slate-900'
+                : 'border-slate-200 bg-white'
+            }`}>
+              <h3 className={`font-semibold mb-4 ${
+                isDark ? 'text-slate-100' : 'text-slate-900'
+              }`}>Resumen de tu Compra</h3>
+              <div className={`space-y-3 mb-4 pb-4 border-b ${
+                isDark ? 'border-slate-800' : 'border-slate-200'
+              }`}>
                 {items.map((item) => (
                   <div key={item.productId} className="flex justify-between text-sm">
-                    <span className="text-slate-300">{item.quantity}x {item.name}</span>
-                    <span className="font-medium text-slate-100">
+                    <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{item.quantity}x {item.name}</span>
+                    <span className={`font-medium ${
+                      isDark ? 'text-slate-100' : 'text-slate-900'
+                    }`}>
                       {formatPrice(item.price * item.quantity)}
                     </span>
                   </div>
                 ))}
               </div>
               <div className="flex justify-between font-bold">
-                <span className="text-slate-100">Total:</span>
-                <span className="text-amber-400 text-lg">{formatPrice(total)}</span>
+                <span className={isDark ? 'text-slate-100' : 'text-slate-900'}>Total:</span>
+                <span className={`text-lg ${
+                  isDark ? 'text-blue-400' : 'text-blue-600'
+                }`}>{formatPrice(total)}</span>
               </div>
             </div>
           </div>

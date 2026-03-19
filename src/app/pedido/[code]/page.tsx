@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useTheme } from '@/lib/theme-context';
 import { formatPrice } from '@/lib/utils';
 import { BrandHeader } from '@/components/brand-header';
 
@@ -14,13 +15,15 @@ type Order = {
   status: string;
   createdAt: string;
   items: Array<{
-    productId: string;
+    productId: number;
     quantity: number;
     unitPrice: number;
   }>;
 };
 
 export default function OrderPage({ params }: { params: Promise<{ code: string }> }) {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +96,7 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950">
+      <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
         <BrandHeader 
           event="Cargando pedido..."
           subtitle="Preventa oficial de bebidas"
@@ -107,7 +110,7 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
 
   if (error || !order) {
     return (
-      <main className="min-h-screen bg-slate-950">
+      <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
         <BrandHeader 
           event="Error"
           subtitle="Preventa oficial de bebidas"
@@ -115,7 +118,7 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
         <div className="mx-auto max-w-2xl px-6 py-12">
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center">
             <p className="text-red-300 font-medium">{error || 'Pedido no encontrado'}</p>
-            <Link href="/" className="mt-4 inline-block text-sm text-amber-400 hover:text-amber-300">
+            <Link href="/" className="mt-4 inline-block text-sm text-slate-700 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200">
               Volver al inicio
             </Link>
           </div>
@@ -125,7 +128,7 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
   }
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
       <BrandHeader 
         event="Pedido Confirmado"
         subtitle="Preventa oficial de bebidas"
@@ -133,7 +136,7 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
 
       <div className="mx-auto max-w-2xl px-6 py-12">
         <div className="mb-6">
-          <Link href="/" className="text-sm text-amber-400 hover:text-amber-300">
+          <Link href="/" className="text-sm text-slate-700 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200">
             ← Volver al inicio
           </Link>
         </div>

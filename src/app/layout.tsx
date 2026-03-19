@@ -1,13 +1,7 @@
 import type { Metadata } from "next";
-import { Montserrat } from "next/font/google";
 import { CartProvider } from "@/lib/cart-context";
+import { ThemeProvider } from "@/lib/theme-context";
 import "./globals.css";
-
-const montserrat = Montserrat({
-  variable: "--font-montserrat",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
 
 export const metadata: Metadata = {
   title: "DIEZ PRODUCCIONES - Preventa Oficial",
@@ -20,11 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="dark">
-      <body
-        className={`${montserrat.variable} antialiased bg-slate-950 text-slate-100`}
-      >
-        <CartProvider>{children}</CartProvider>
+    <html lang="es" suppressHydrationWarning>
+      <body className="antialiased">
+        <ThemeProvider>
+          <CartProvider>{children}</CartProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

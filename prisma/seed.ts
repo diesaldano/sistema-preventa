@@ -12,67 +12,67 @@ async function main() {
   await prisma.product.deleteMany({});
   console.log('✓ Base de datos limpia\n');
 
-  // Crear 6 productos con IDs numéricos
+  // Crear 6 productos
   console.log('🍺 Creando productos...');
   const products = await Promise.all([
     prisma.product.create({
       data: {
+        id: 'cerveza-quilmes',
         name: 'Cerveza Quilmes',
         description: 'Lata 355ml - Clásica',
         price: 150000,  // $1500 centavos
         category: 'cerveza',
         stock: 200,
-        active: true,
       },
     }),
     prisma.product.create({
       data: {
+        id: 'cerveza-brahma',
         name: 'Cerveza Brahma',
         description: 'Lata 350ml - Tradicional',
         price: 140000,  // $1400
         category: 'cerveza',
         stock: 200,
-        active: true,
       },
     }),
     prisma.product.create({
       data: {
+        id: 'cerveza-corona',
         name: 'Cerveza Corona',
         description: 'Botella 355ml - Premium',
         price: 250000,  // $2500
         category: 'cerveza',
         stock: 150,
-        active: true,
       },
     }),
     prisma.product.create({
       data: {
+        id: 'fernet-branca',
         name: 'Fernet Branca',
         description: 'Botella 750ml - Digestivo',
         price: 1200000,  // $12000
         category: 'fernet',
         stock: 50,
-        active: true,
       },
     }),
     prisma.product.create({
       data: {
+        id: 'coca-cola',
         name: 'Coca-Cola',
         description: 'Lata 355ml - Bebida',
         price: 250000,  // $2500
         category: 'combinado',
         stock: 100,
-        active: true,
       },
     }),
     prisma.product.create({
       data: {
+        id: 'sprite',
         name: 'Sprite',
         description: 'Lata 355ml - Lima Limón',
         price: 250000,  // $2500
         category: 'combinado',
         stock: 100,
-        active: true,
       },
     }),
   ]);
@@ -98,9 +98,10 @@ async function main() {
         items: {
           create: [
             {
-              productId: products[0].id,
+              id: `item-001-1`,
+              productId: 'cerveza-quilmes',
               quantity: 2,
-              unitPrice: 150000,
+              price: 150000,
             },
           ],
         },
@@ -118,9 +119,10 @@ async function main() {
         items: {
           create: [
             {
-              productId: products[3].id,
+              id: `item-002-1`,
+              productId: 'fernet-branca',
               quantity: 2,
-              unitPrice: 1200000,
+              price: 1200000,
             },
           ],
         },
@@ -138,14 +140,16 @@ async function main() {
         items: {
           create: [
             {
-              productId: products[0].id,
+              id: `item-003-1`,
+              productId: 'cerveza-quilmes',
               quantity: 2,
-              unitPrice: 150000,
+              price: 150000,
             },
             {
-              productId: products[4].id,
+              id: `item-003-2`,
+              productId: 'coca-cola',
               quantity: 1,
-              unitPrice: 250000,
+              price: 250000,
             },
           ],
         },
@@ -163,9 +167,10 @@ async function main() {
         items: {
           create: [
             {
-              productId: products[2].id,
+              id: `item-004-1`,
+              productId: 'cerveza-corona',
               quantity: 2,
-              unitPrice: 250000,
+              price: 250000,
             },
           ],
         },

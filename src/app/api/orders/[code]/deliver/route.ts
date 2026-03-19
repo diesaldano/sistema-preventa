@@ -54,11 +54,7 @@ export async function POST(
     // Staff entrega → REDEEMED (FINAL)
     const updatedOrder = await db.order.updateStatus(code, 'REDEEMED');
 
-    return NextResponse.json({
-      success: true,
-      message: '✓ Pedido entregado exitosamente. Estado: REDEEMED (final)',
-      data: updatedOrder,
-    });
+    return NextResponse.json(updatedOrder);
   } catch (error) {
     // Si es error de REDEEMED, dar mensaje especial
     if (error instanceof Error && error.message.includes('REDEEMED')) {

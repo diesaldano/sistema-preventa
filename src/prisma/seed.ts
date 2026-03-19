@@ -40,14 +40,10 @@ async function main() {
   ];
 
   for (const product of products) {
-    await prisma.product.upsert({
-      where: { 
-        id: product.name.toLowerCase().replace(/\s/g, "-") 
-      },
-      update: product,
-      create: { 
-        id: product.name.toLowerCase().replace(/\s/g, "-"),
-        ...product
+    await prisma.product.create({
+      data: {
+        ...product,
+        slug: product.name.toLowerCase().replace(/\s/g, "-"),
       },
     });
   }

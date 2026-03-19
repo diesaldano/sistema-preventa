@@ -122,7 +122,7 @@ export const productsDB = {
   /**
    * UPDATE - Actualizar producto
    */
-  update: (id: string, updates: Partial<Product>): Product | null => {
+  update: (id: number, updates: Partial<Product>): Product | null => {
     const index = products.findIndex((p) => p.id === id);
     if (index === -1) return null;
     products[index] = { ...products[index], ...updates };
@@ -132,7 +132,7 @@ export const productsDB = {
   /**
    * DELETE - Eliminar producto
    */
-  delete: (id: string): boolean => {
+  delete: (id: number): boolean => {
     const index = products.findIndex((p) => p.id === id);
     if (index === -1) return false;
     products.splice(index, 1);
@@ -142,7 +142,7 @@ export const productsDB = {
   /**
    * BATCH UPDATE - Aumentar/disminuir stock
    */
-  updateStock: (id: string, quantityChange: number): Product | null => {
+  updateStock: (id: number, quantityChange: number): Product | null => {
     const product = products.find((p) => p.id === id);
     if (!product) return null;
     product.stock = Math.max(0, product.stock + quantityChange);

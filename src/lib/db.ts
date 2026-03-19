@@ -19,6 +19,18 @@ if (process.env.NODE_ENV !== 'production') globalThis.prismaInstance = prismaSin
 const prisma = prismaSingleton;
 
 /**
+ * Generar slug a partir del nombre
+ * Ej: "Cerveza Quilmes" → "cerveza-quilmes"
+ */
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]/g, '');
+}
+
+/**
  * 🎯 Interfaz de BD para Productos
  */
 export const db = {
@@ -83,6 +95,7 @@ export const db = {
     create: async (data: Product) => {
       const product = await prisma.product.create({
         data: {
+          slug: generateSlug(data.name),
           name: data.name,
           description: data.description,
           price: data.price,
@@ -102,15 +115,19 @@ export const db = {
     },
 
     update: async (id: number, data: Partial<Product>) => {
+      const updateData: any = {};
+      if (data.name) {
+        updateData.slug = generateSlug(data.name);
+        updateData.name = data.name;
+      }
+      if (data.description !== undefined) updateData.description = data.description;
+      if (data.price !== undefined) updateData.price = data.price;
+      if (data.category !== undefined) updateData.category = data.category;
+      if (data.stock !== undefined) updateData.stock = data.stock;
+
       const product = await prisma.product.update({
         where: { id },
-        data: {
-          name: data.name,
-          description: data.description,
-          price: data.price,
-          category: data.category,
-          stock: data.stock,
-        },
+        data: updateData,
       });
       return {
         id: product.id,
@@ -165,7 +182,7 @@ export const db = {
         items: o.items.map((item: any) => ({
           productId: item.productId,
           quantity: item.quantity,
-          price: item.unitPrice,
+          unitPrice: item.price,
         })),
         total: o.total,
         status: o.status as OrderStatus,
@@ -188,7 +205,7 @@ export const db = {
         items: order.items.map((item: any) => ({
           productId: item.productId,
           quantity: item.quantity,
-          price: item.unitPrice,
+          unitPrice: item.price,
         })),
         total: order.total,
         status: order.status as OrderStatus,
@@ -212,7 +229,7 @@ export const db = {
         items: o.items.map((item: any) => ({
           productId: item.productId,
           quantity: item.quantity,
-          price: item.unitPrice,
+          unitPrice: item.price,
         })),
         total: o.total,
         status: o.status as OrderStatus,
@@ -236,7 +253,7 @@ export const db = {
         items: o.items.map((item: any) => ({
           productId: item.productId,
           quantity: item.quantity,
-          price: item.unitPrice,
+          unitPrice: item.price,
         })),
         total: o.total,
         status: o.status as OrderStatus,
@@ -260,7 +277,7 @@ export const db = {
         items: o.items.map((item: any) => ({
           productId: item.productId,
           quantity: item.quantity,
-          price: item.unitPrice,
+          unitPrice: item.price,
         })),
         total: o.total,
         status: o.status as OrderStatus,
@@ -282,7 +299,7 @@ export const db = {
             create: data.items.map((item) => ({
               productId: item.productId,
               quantity: item.quantity,
-              unitPrice: item.price,
+              price: item.price,
             })),
           },
         },
@@ -296,7 +313,7 @@ export const db = {
         items: order.items.map((item: any) => ({
           productId: item.productId,
           quantity: item.quantity,
-          price: item.unitPrice,
+          price: item.price,
         })),
         total: order.total,
         status: order.status as OrderStatus,
@@ -320,7 +337,7 @@ export const db = {
           items: order.items.map((item: any) => ({
             productId: item.productId,
             quantity: item.quantity,
-            price: item.unitPrice,
+            price: item.price,
           })),
           total: order.total,
           status: order.status as OrderStatus,
@@ -352,7 +369,7 @@ export const db = {
         items: order.items.map((item: any) => ({
           productId: item.productId,
           quantity: item.quantity,
-          price: item.unitPrice,
+          price: item.price,
         })),
         total: order.total,
         status: order.status as OrderStatus,
@@ -362,9 +379,13 @@ export const db = {
     },
 
     delete: async (code: string) => {
-      // Primero eliminar items relacionados
+      // Primero obtener la orden para conocer su ID
+      const order = await prisma.order.findUnique({ where: { code } });
+      if (!order) return false;
+      
+      // Eliminar items relacionados usando el ID numérico
       await prisma.orderItem.deleteMany({
-        where: { orderId: code },
+        where: { orderId: order.id },
       });
       // Luego eliminar la orden
       await prisma.order.delete({ where: { code } });
@@ -410,7 +431,7 @@ export const db = {
         items: order.items.map((item: any) => ({
           productId: item.productId,
           quantity: item.quantity,
-          price: item.unitPrice,
+          price: item.price,
         })),
         total: order.total,
         status: order.status as OrderStatus,

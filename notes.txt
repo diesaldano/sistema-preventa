@@ -14,7 +14,7 @@ CONTEXTO
 PROBLEMAS IDENTIFICADOS
 ================================================================================
 
-1. PERFORMANCE & CACHING
+1. PERFORMANCE & CACHING - listo
    - Problema: Cambios de precios/contenido raros → llamadas innecesarias
    - Impacto: Múltiples usuarios = múltiples queries iguales a BD
    - Ejemplo: GET /api/products se llama en cada visita a /
@@ -26,7 +26,7 @@ PROBLEMAS IDENTIFICADOS
 
 ---
 
-2. ATAQUES POR VOLUMEN / ABUSE
+2. ATAQUES POR VOLUMEN / ABUSE listo
    - Problema: Múltiples pedidos seguidos desde mismo IP
    
    Escenarios:
@@ -77,7 +77,7 @@ PROBLEMAS IDENTIFICADOS
 REQUERIMIENTOS POR FASE
 ================================================================================
 
-PHASE 1: Validación & Seguridad Básica [URGENTE - HOY]
+PHASE 1: Validación & Seguridad Básica listo
 =========================================================
 
 R1.1: Validar todos los inputs en backend
@@ -86,13 +86,13 @@ R1.1: Validar todos los inputs en backend
       ✓ Nombre 2-50 caracteres, sin números
       ✓ Comprobante: JPG/PNG, <5MB
 
-R1.2: Recalcular precio SIEMPRE
+R1.2: Recalcular precio SIEMPRE listo
       ✓ Lookup cada producto por ID en BD
       ✓ Obtener precio actual de BD
       ✓ Calcular: Σ(precio × cantidad) = total esperado
       ✓ Si no coincide con frontend: RECHAZAR + loguear
 
-R1.3: Prevenir doble-creación
+R1.3: Prevenir doble-creación listo
       ✓ Unique constraint (email + timestamp) con 5 min window
       ✓ Deshabilitar botón en frontend después del click
       ✓ Validar en backend que no hay orden dup en últimos 5 min
@@ -105,7 +105,7 @@ R1.4: Rate limiting básico
 
 ---
 
-PHASE 2: Caching & Performance [ALTA PRIORIDAD - PRÓXIMOS DÍAS]
+PHASE 2: Caching & Performance - listo
 ===============================================================
 
 R2.1: Cache de productos
@@ -125,7 +125,7 @@ R2.3: Cache de órdenes (admin)
 
 ---
 
-PHASE 3: Monitoring & Abuse Detection [MEDIA PRIORIDAD - PRÓXIMA SEMANA]
+PHASE 3: Monitoring & Abuse Detection - listo
 =========================================================================
 
 R3.1: Log de intentos fallidos

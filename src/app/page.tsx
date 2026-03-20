@@ -8,7 +8,7 @@ import { CartSummary } from '@/components/cart-summary';
 import { BrandHeader } from '@/components/brand-header';
 
 export default function Home() {
-  const { products, loading, error } = useProducts();
+  const { products, loading, error, cacheHit } = useProducts();
   const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const isDark = theme === 'dark';

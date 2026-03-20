@@ -63,3 +63,22 @@ enum OrderStatus {
   REDEEMED
   CANCELLED
 }
+
+/**
+ * R3.1: Security Log para tracking de intentos fallidos
+ * Usado para detectar patrones de abuse y análisis
+ */
+model SecurityLog {
+  id        String   @id @default(cuid())
+  clientIp  String
+  email     String
+  reason    String   // invalid_input, duplicate, rate_limit, fraud, stock_issue, etc
+  details   String?  // Descripción adicional del error
+  createdAt DateTime @default(now())
+
+  @@index([clientIp])
+  @@index([email])
+  @@index([reason])
+  @@index([createdAt])
+  @@map("security_logs")
+}

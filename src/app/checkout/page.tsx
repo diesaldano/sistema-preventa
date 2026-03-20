@@ -5,7 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/lib/cart-context';
 import { useTheme } from '@/lib/theme-context';
-import { formatPrice } from '@/lib/utils';
+import { 
+  formatPrice,
+  isValidEmail,
+  isValidPhone,
+  isValidName,
+  sanitizeName,
+  isValidComprobante
+} from '@/lib/utils';
 import CheckoutStepper from '@/components/checkout-stepper';
 import { AlertCircle, Upload, X, CheckCircle } from 'lucide-react';
 import { BrandHeader } from '@/components/brand-header';
@@ -76,13 +83,60 @@ export default function CheckoutPage() {
     );
   }
 
-  const isStep1Valid = formData.name.trim() && formData.email.trim() && formData.phone.trim();
+  // ============================================================
+  // Validación Frontend Consistente con Backend (R1.1)
+  // ============================================================
+
+  const validateName = (name: string): { valid: boolean; error?: string } => {
+    if (!name.trim()) {
+      return { valid: false, error: 'El nombre es requerido' };
+    }
+    if (!isValidName(name)) {
+      return { valid: false, error: 'Nombre debe tener 2-50 caracteres, sin números' };
+    }
+    return { valid: true };
+  };
+
+  const validateEmail = (email: string): { valid: boolean; error?: string } => {
+    if (!email.trim()) {
+      return { valid: false, error: 'El email es requerido' };
+    }
+    if (!isValidEmail(email)) {
+      return { valid: false, error: 'Email no válido. Ej: nombre@dominio.com' };
+    }
+    return { valid: true };
+  };
+
+  const validatePhone = (phone: string): { valid: boolean; error?: string } => {
+    if (!phone.trim()) {
+      return { valid: false, error: 'El teléfono es requerido' };
+    }
+    if (!isValidPhone(phone)) {
+      return { valid: false, error: 'Teléfono debe tener al menos 10 dígitos' };
+    }
+    return { valid: true };
+  };
+
+  const nameValidation = validateName(formData.name);
+  const emailValidation = validateEmail(formData.email);
+  const phoneValidation = validatePhone(formData.phone);
+
+  const isStep1Valid = nameValidation.valid && emailValidation.valid && phoneValidation.valid;
 
   const handleNextStep = async () => {
     setError(null);
     if (currentStep === 1) {
-      if (!isStep1Valid) {
-        setError('Por favor completa todos los campos');
+      // Mostrar primer error encontrado
+      if (!nameValidation.valid) {
+        setError(nameValidation.error || 'Nombre inválido');
+        return;
+      }
+      if (!emailValidation.valid) {
+        setError(emailValidation.error || 'Email inválido');
+        return;
+      }
+      if (!phoneValidation.valid) {
+        setError(phoneValidation.error || 'Teléfono inválido');
         return;
       }
       setCurrentStep(2);
@@ -101,15 +155,11 @@ export default function CheckoutPage() {
   };
 
   const handleFileSelect = (file: File) => {
-    const validTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    const maxSize = 5 * 1024 * 1024;
-
-    if (!validTypes.includes(file.type)) {
-      setError('Formato no válido. Usa JPG, PNG o PDF');
-      return;
-    }
-    if (file.size > maxSize) {
-      setError('Archivo demasiado grande. Máximo 5MB');
+    // R1.1: Validación de comprobante - solo JPG/PNG
+    const validationResult = isValidComprobante(file.type, file.size);
+    
+    if (!validationResult.valid) {
+      setError(validationResult.error || 'Archivo no válido');
       return;
     }
 
@@ -132,9 +182,11 @@ export default function CheckoutPage() {
 
     try {
       const formDataToSend = new FormData();
-      formDataToSend.append('customerName', formData.name);
-      formDataToSend.append('customerEmail', formData.email);
-      formDataToSend.append('customerPhone', formData.phone);
+      formDataToSend.append('customerName', sanitizeName(formData.name));
+      formDataToSend.append('customerEmail', formData.email.toLowerCase().trim());
+      formDataToSend.append('customerPhone', formData.phone.replace(/\D/g, ''));
+      
+      // R1.2 (próximo): El backend recalculará el total
       formDataToSend.append(
         'items',
         JSON.stringify(
@@ -145,7 +197,9 @@ export default function CheckoutPage() {
           }))
         )
       );
-      formDataToSend.append('total', total.toString());
+      
+      // OJO: No enviamos total, backend lo recalcula desde productos BD
+      // formDataToSend.append('total', total.toString());
 
       if (uploadedFile) {
         formDataToSend.append('comprobante', uploadedFile);
@@ -157,6 +211,20 @@ export default function CheckoutPage() {
       });
 
       const data = await response.json();
+
+      // R1.3: Manejo de doble-creación (409)
+      if (response.status === 409) {
+        setError(`Ya tienes una orden reciente (${data.recentOrderCode}). Puedes verla en tu historial o espera 5 minutos para crear otra.`);
+        setLoading(false);
+        return;
+      }
+
+      // R1.4: Manejo de rate limiting (429)
+      if (response.status === 429) {
+        // Redirigir a página de bloqueo temporal
+        router.push('/checkout/blocked');
+        return;
+      }
 
       if (!response.ok || !data.code) {
         throw new Error(data.error ?? 'Error al crear el pedido');
@@ -495,11 +563,11 @@ export default function CheckoutPage() {
                 )}
                 <p className={`text-xs ${
                   isDark ? 'text-slate-400' : 'text-slate-600'
-                }`}>Formatos: JPG, PNG, PDF (máx 5MB)</p>
+                }`}>Formatos: JPG, PNG (máx 5MB)</p>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".jpg,.jpeg,.png,.pdf"
+                  accept=".jpg,.jpeg,.png"
                   onChange={(e) => {
                     if (e.target.files?.[0]) {
                       handleFileSelect(e.target.files[0]);

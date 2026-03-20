@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import useSWR from 'swr';
 import { useTheme } from '@/lib/theme-context';
 import { formatPrice } from '@/lib/utils';
 import { BrandHeader } from '@/components/brand-header';
+import { getPollingConfig, savePollingConfig, PollingConfig } from '@/lib/polling-config';
 
 type Order = {
   code: string;
@@ -21,29 +23,68 @@ type Order = {
   }>;
 };
 
+/**
+ * PHASE 2 - R2.3: Fetcher para SWR
+ */
+const fetcher = (url: string) =>
+  fetch(url).then((res) => {
+    if (!res.ok) throw new Error('Failed to fetch');
+    return res.json();
+  });
+
 export default function AdminPage() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
+  
+  // R2.3: Polling config (enabled/disabled + seconds)
+  const [pollingConfig, setPollingConfig] = useState<PollingConfig>({
+    enabled: false,
+    intervalMs: 5000,
+  });
 
+  // Cargar config guardada al montar
   useEffect(() => {
-    fetchOrders();
+    const saved = getPollingConfig();
+    setPollingConfig(saved);
   }, []);
 
-  async function fetchOrders() {
-    try {
-      const response = await fetch('/api/orders');
-      const data = await response.json();
-      setOrders(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError('Error al cargar los pedidos');
-    } finally {
-      setLoading(false);
+  /**
+   * R2.3: Toggle polling on/off
+   */
+  const handleTogglePolling = () => {
+    const newConfig = { ...pollingConfig, enabled: !pollingConfig.enabled };
+    setPollingConfig(newConfig);
+    savePollingConfig(newConfig);
+  };
+
+  /**
+   * R2.3: Cambiar intervalo en segundos
+   */
+  const handleChangeInterval = (seconds: number) => {
+    const newConfig = { ...pollingConfig, intervalMs: seconds * 1000 };
+    setPollingConfig(newConfig);
+    savePollingConfig(newConfig);
+  };
+
+  /**
+   * PHASE 2 - R2.3: useSWR con polling configurable
+   * - refreshInterval: 0 si disabled, intervalMs si enabled
+   * - Sin bloqueos, simple config
+   */
+  const { data, error, isLoading, mutate } = useSWR<Order[]>(
+    '/api/orders',
+    fetcher,
+    {
+      refreshInterval: pollingConfig.enabled ? pollingConfig.intervalMs : 0,
+      dedupingInterval: 2000,
+      fallbackData: [],
     }
-  }
+  );
+
+  const orders = data || [];
+  const loading = isLoading && orders.length === 0;
+  const hasError = error !== undefined;
 
   async function handleValidate(code: string) {
     setProcessing(code);
@@ -56,9 +97,8 @@ export default function AdminPage() {
         throw new Error('Error al validar');
       }
 
-      setOrders((prev) =>
-        prev.map((o) => (o.code === code ? { ...o, status: 'PAID' } : o))
-      );
+      // R2.3: Usar mutate() para refetch automático
+      mutate();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -79,9 +119,8 @@ export default function AdminPage() {
         throw new Error('Error al rechazar');
       }
 
-      setOrders((prev) =>
-        prev.map((o) => (o.code === code ? { ...o, status: 'CANCELLED' } : o))
-      );
+      // R2.3: Usar mutate() para refetch automático
+      mutate();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -89,10 +128,10 @@ export default function AdminPage() {
     }
   }
 
-  const pendingOrders = orders.filter((o) => o.status === 'PAYMENT_REVIEW' || o.status === 'PENDING_PAYMENT');
-  const confirmadoOrders = orders.filter((o) => o.status === 'PAID');
-  const deliveredOrders = orders.filter((o) => o.status === 'REDEEMED');
-  const cancelledOrders = orders.filter((o) => o.status === 'CANCELLED');
+  const pendingOrders = orders.filter((o: Order) => o.status === 'PAYMENT_REVIEW' || o.status === 'PENDING_PAYMENT');
+  const confirmadoOrders = orders.filter((o: Order) => o.status === 'PAID');
+  const deliveredOrders = orders.filter((o: Order) => o.status === 'REDEEMED');
+  const cancelledOrders = orders.filter((o: Order) => o.status === 'CANCELLED');
 
   return (
     <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
@@ -102,11 +141,69 @@ export default function AdminPage() {
       />
 
       <div className="mx-auto max-w-6xl px-6 py-12">
-        {error && (
+        {hasError && (
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300 mb-6">
-            {error}
+            Error al cargar los pedidos
           </div>
         )}
+
+        {/* POLLING CONTROL - R2.3 */}
+        <div className={`rounded-lg border p-4 mb-8 transition-colors ${
+          isDark
+            ? 'border-slate-700 bg-slate-900'
+            : 'border-slate-200 bg-slate-50'
+        }`}>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <label className={`text-sm font-semibold ${
+                isDark ? 'text-slate-300' : 'text-slate-700'
+              }`}>
+                Auto-refresh de órdenes:
+              </label>
+              <button
+                onClick={handleTogglePolling}
+                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  pollingConfig.enabled
+                    ? isDark
+                      ? 'bg-emerald-500/30 text-emerald-400 hover:bg-emerald-500/40'
+                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                    : isDark
+                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                }`}
+              >
+                {pollingConfig.enabled ? '✓ ACTIVADO' : '○ DESACTIVADO'}
+              </button>
+            </div>
+
+            {pollingConfig.enabled && (
+              <div className="flex items-center gap-3">
+                <label className={`text-sm ${
+                  isDark ? 'text-slate-400' : 'text-slate-600'
+                }`}>
+                  Cada:
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={pollingConfig.intervalMs / 1000}
+                  onChange={(e) => handleChangeInterval(Math.max(1, Math.min(60, parseInt(e.target.value) || 5)))}
+                  className={`w-16 px-2 py-1 rounded text-center text-sm font-mono ${
+                    isDark
+                      ? 'bg-slate-800 border border-slate-700 text-slate-100'
+                      : 'bg-white border border-slate-300 text-slate-900'
+                  }`}
+                />
+                <span className={`text-sm ${
+                  isDark ? 'text-slate-400' : 'text-slate-600'
+                }`}>
+                  segundos
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Estadísticas */}
         <div className="grid gap-4 sm:grid-cols-5 mb-8">
@@ -194,7 +291,7 @@ export default function AdminPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {pendingOrders.map((order) => (
+              {pendingOrders.map((order: Order) => (
                 <div
                   key={order.code}
                   className={`rounded-lg border p-4 transition-colors ${
@@ -262,7 +359,7 @@ export default function AdminPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {confirmadoOrders.map((order) => (
+              {confirmadoOrders.map((order: Order) => (
                 <div key={order.code} className={`rounded-lg border p-4 transition-colors ${
                   isDark
                     ? 'border-emerald-500/30 bg-emerald-500/5'
@@ -307,7 +404,7 @@ export default function AdminPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {deliveredOrders.map((order) => (
+              {deliveredOrders.map((order: Order) => (
                 <div key={order.code} className={`rounded-lg border p-4 transition-colors ${
                   isDark
                     ? 'border-blue-500/30 bg-blue-500/5'
@@ -352,7 +449,7 @@ export default function AdminPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {cancelledOrders.map((order) => (
+              {cancelledOrders.map((order: Order) => (
                 <div key={order.code} className={`rounded-lg border p-4 transition-colors ${
                   isDark
                     ? 'border-red-500/30 bg-red-500/5'

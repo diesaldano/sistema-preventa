@@ -1,0 +1,830 @@
+================================================================================
+DEFINICIONES - SISTEMA DE PREVENTA DIEZ PRODUCCIONES
+================================================================================
+
+CONTEXTO
+--------
+- App: Preventa de bebidas para eventos (500-1000 personas)
+- DB: Supabase operativa (compartida: dev/prod/localhost)
+- Layout: Dinámico (baja prioridad)
+- Contenido/Precios: Cambian poco
+- Estado: Sistema funcionando, necesita solidificar antes de más features
+
+================================================================================
+PROBLEMAS IDENTIFICADOS
+================================================================================
+
+1. PERFORMANCE & CACHING
+   - Problema: Cambios de precios/contenido raros → llamadas innecesarias
+   - Impacto: Múltiples usuarios = múltiples queries iguales a BD
+   - Ejemplo: GET /api/products se llama en cada visita a /
+   
+   Solución propuesta:
+   ✓ Caching en cliente (localStorage) con versión
+   ✓ Caching en servidor (memory) con TTL
+   ✓ Invalidación inteligente (solo cuando hay cambios)
+
+---
+
+2. ATAQUES POR VOLUMEN / ABUSE
+   - Problema: Múltiples pedidos seguidos desde mismo IP
+   
+   Escenarios:
+   • Script en loop creando pedidos falsos
+   • Usuario hace doble-click accidental
+   • Bot intenta cargar la BD
+   
+   Solución propuesta:
+   ✓ Rate limit por IP (5 órdenes/hora)
+   ✓ Rate limit por email (2 órdenes/hora)
+   ✓ Validación de tiempo entre pedidos
+   ✓ Detección de patrones sospechosos
+
+---
+
+3. INYECCIÓN & VALIDACIÓN
+   - Problema: Formulario acepta cualquier cosa → riesgo SQL injection/XSS
+   
+   Casos:
+   • SQL injection en búsquedas
+   • XSS en campos de nombre/email
+   • Datos malformados rompen BD
+   
+   Solución propuesta:
+   ✓ Validación frontend (UX)
+   ✓ Validación backend STRICT (seguridad)
+   ✓ Sanitización de inputs
+   ✓ Prisma previene SQL injection (parametrized queries)
+   ✓ Escapar outputs en JSX
+
+---
+
+4. INTEGRIDAD DE BD
+   - Problema: Cambios desde clientes (offline, errores) pueden corromper estado
+   
+   Casos:
+   • Usuario modifica precio en consola antes de enviar
+   • Doble clic en "Crear Pedido" → 2 órdenes iguales
+   • Comprobante corrupto
+   
+   Solución propuesta:
+   ✓ Backend recalcula precios (NUNCA confiar en frontend)
+   ✓ Validaciones atómicas en BD
+   ✓ Deduplicación por email+timestamp
+   ✓ Unique constraint en BD
+
+================================================================================
+REQUERIMIENTOS POR FASE
+================================================================================
+
+PHASE 1: Validación & Seguridad Básica [URGENTE - HOY]
+=========================================================
+
+R1.1: Validar todos los inputs en backend
+      ✓ Email válido y formato correcto
+      ✓ Teléfono 10+ dígitos (Argentina)
+      ✓ Nombre 2-50 caracteres, sin números
+      ✓ Comprobante: JPG/PNG, <5MB
+
+R1.2: Recalcular precio SIEMPRE
+      ✓ Lookup cada producto por ID en BD
+      ✓ Obtener precio actual de BD
+      ✓ Calcular: Σ(precio × cantidad) = total esperado
+      ✓ Si no coincide con frontend: RECHAZAR + loguear
+
+R1.3: Prevenir doble-creación
+      ✓ Unique constraint (email + timestamp) con 5 min window
+      ✓ Deshabilitar botón en frontend después del click
+      ✓ Validar en backend que no hay orden dup en últimos 5 min
+
+R1.4: Rate limiting básico
+      ✓ 5 órdenes por IP en 1 hora
+      ✓ 2 órdenes por email en 1 hora
+      ✓ Si se excede: devolver 429 (Too Many Requests)
+      ✓ Bloqueo temporal (15 min, 1 hora)
+
+---
+
+PHASE 2: Caching & Performance [ALTA PRIORIDAD - PRÓXIMOS DÍAS]
+===============================================================
+
+R2.1: Cache de productos
+      ✓ GET /api/products con header: Cache-Control: max-age=3600
+      ✓ Cliente almacena en localStorage + timestamp
+      ✓ Si < 1h: usar local, si > 1h: refetch
+
+R2.2: Cache invalidation
+      ✓ POST /api/products/refresh (admin only)
+      ✓ Borra cache en BD y servidor
+      ✓ Devuelve nueva versión a clientes
+
+R2.3: Cache de órdenes (admin)
+      ✓ Polling cada 5 segundos (no real-time aún)
+      ✓ Usar SWR o React Query para auto-refresh
+      ✓ Fase 3: websocket para real-time
+
+---
+
+PHASE 3: Monitoring & Abuse Detection [MEDIA PRIORIDAD - PRÓXIMA SEMANA]
+=========================================================================
+
+R3.1: Log de intentos fallidos
+      ✓ Guardar en BD: table security_logs (IMPLEMENTADA)
+      ✓ Campos: IP, email, razón rechazo, timestamp, detalles
+      ✓ Queries helpers: getByIp, getByEmail, getByReason
+      ✓ Loguea: invalid_input, duplicate, rate_limit, fraud, stock_issue
+
+R3.2: Alert si spam detectado
+      ○ >10 intentos fallidos de mismo IP en 1h
+      ○ >5 órdenes rechazadas de mismo email
+      ○ Notificar admin (email o dashboard)
+
+R3.3: Analítica básica
+      ○ Órdenes por hora
+      ○ Tasa de aceptación/rechazo
+      ○ Códigos más activos
+      ○ Ingresos totales
+
+================================================================================
+CAMPOS DE FORMULARIO & VALIDACIÓN
+================================================================================
+
+CAMPO: name (Nombre)
+------
+Frontend:
+  ✓ Requerido
+  ✓ 2-50 caracteres
+  ✓ Mensaje: "Nombre debe tener 2-50 caracteres"
+
+Backend:
+  ✓ Re-validar longitud
+  ✓ No permitir números
+  ✓ Sanitizar especiales
+
+---
+
+CAMPO: email
+------
+Frontend:
+  ✓ Requerido
+  ✓ Formato email válido
+  ✓ Mensaje: "Email no válido"
+
+Backend:
+  ✓ Re-validar formato
+  ✓ Verificar que no hay orden dup en últimos 5 min
+  ✓ Rate limit: max 2 órdenes/hora
+
+---
+
+CAMPO: phone (Teléfono)
+------
+Frontend:
+  ✓ Requerido
+  ✓ 10+ dígitos
+  ✓ Mensaje: "Teléfono debe tener 10+ dígitos"
+
+Backend:
+  ✓ Re-validar formato argentino
+  ✓ Solo números
+
+---
+
+CAMPO: items (Carrito)
+------
+Frontend:
+  ✓ Array con {productId, quantity}
+  ✓ No vacío
+  ✓ Cantidades > 0
+
+Backend:
+  ✓ Validar que existen productos
+  ✓ Validar stock disponible
+  ✓ RECALCULAR precio total
+
+---
+
+CAMPO: total (Precio Total)
+------
+Frontend:
+  ✓ Auto-calculado (Σ price × quantity)
+  ✓ Mostrado pero NO enviado
+
+Backend:
+  ✓ NUNCA confiar en frontend
+  ✓ Recalcular: lookup price de cada producto
+  ✓ Si ≠ frontend: RECHAZAR + loguear fraude
+  ✓ Rate limit: detectar si muchos intentos fallidos
+
+---
+
+CAMPO: comprobante (Proof de pago)
+------
+Frontend:
+  ✓ Opcional o requerido?
+  ✓ JPG/PNG solamente
+  ✓ Max 5MB
+  ✓ Preview antes de enviar
+
+Backend:
+  ✓ Validar MIME type
+  ✓ Validar tamaño
+  ✓ Almacenar en BD (base64 o externa)
+  ✓ Mostrar en admin para validación
+
+================================================================================
+FLUJO DE CREACIÓN DE ORDEN
+================================================================================
+
+CLIENTE ENTRA A /checkout/success CON CÓDIGO
+|
+v
+1. Backend recibe POST /api/orders
+   → Validar email, name, phone
+   → Validar items (array no vacío)
+   → Recalcular total desde BD
+   → Comparar con frontend
+   |
+   ├─ Si ≠ RECHAZAR (fraude)
+   │  └─ Loguear intento
+   │
+   └─ Si = VALIDAR rate limit
+      |
+      ├─ Si cumple límites
+      │  └─ Crear orden en BD
+      │     └─ Generar código único
+      │        └─ Retornar código + success
+      │
+      └─ Si NO cumple
+         └─ Retornar 429 (Too Many Requests)
+
+================================================================================
+TABLA: security_logs (R3.1 - Implementada)
+================================================================================
+
+PROPÓSITO: Registrar todos los intentos fallidos para análisis y detección
+de patrones de abuso
+
+CAMPOS:
+- id (STRING, cuid): Identificador único
+- clientIp (STRING): IP del cliente (desde headers)
+- email (STRING): Email del intento
+- reason (STRING): Razón del rechazo
+  ✓ invalid_input (campos faltantes/inválidos)
+  ✓ duplicate (orden duplicada en últimos 5 min)
+  ✓ rate_limit (excedió 2 órdenes/hora)
+  ✓ fraud (intento de manipular precios)
+  ✓ stock_issue (stock insuficiente)
+- details (TEXT): Información adicional del error
+- createdAt (DATETIME): Timestamp del evento
+
+ÍNDICES:
+- idx clientIp (búsquedas rápidas por IP)
+- idx email (búsquedas rápidas por email)
+- idx reason (análisis por tipo de error)
+- idx createdAt (queries por rango temporal)
+
+USO FUTURO (PHASE 3):
+- Detectar >10 intentos fallidos mismo IP en 1h
+- Alertar admin si spam detectado
+- Analítica: tasa de rechazo, patrones por hora
+- Blacklisting de IPs/emails abusivos
+
+QUERIES DISPONIBLES EN db.ts:
+- db.securityLog.create(ip, email, reason, details)
+- db.securityLog.getByIp(ip, hoursBack)
+- db.securityLog.getByEmail(email, hoursBack)
+- db.securityLog.getByReason(reason, hoursBack)
+
+================================================================================
+PHASE 4: Auth & Infrastructure Security [PRIORIDAD ALTA - DESPUÉS PHASE 2-3]
+================================================================================
+
+CONTEXTO: 500-1000 personas en evento. Necesitamos:
+- Acceso invitado a compra (sin auth)
+- Admin para validar pagos y análisis
+- Staff para marcar entregas (tablet/web)
+- Escalabilidad y seguridad robusta
+
+ARQUITECTURA DE ROLES
+====================
+
+1. PÚBLICO (Invitado)
+   - Accede: compra como guest
+   - NO requiere auth
+   - Rutas: /checkout, GET /api/products, POST /api/orders, GET /pedido/[code]
+   - Protección: rate limiti (PHASE 1), validación (PHASE 1), logs (PHASE 3.1)
+
+2. ADMIN
+   - Accede: validar pagos, ver análisis, gestionar productos
+   - Requiere: JWT token (after login)
+   - Rutas: /admin/*, GET /api/orders, POST /api/orders/[code]/validate, POST /api/products/refresh
+   - Permisos: crear usuarios staff, ver security logs, configurar system
+
+3. STAFF
+   - Accede: marcar entregas en evento (tablet/celular)
+   - Requiere: JWT token (after login)
+   - Rutas: /despacho/*, GET /api/orders/[code], POST /api/orders/[code]/deliver
+   - Permisos: entrega de bebidas, búsqueda por código
+
+
+AUTENTICACIÓN (JWT + DB)
+========================
+
+R4.1: POST /api/auth/login
+      - Input: email + password
+      - Validar contra users table (password_hash con bcrypt)
+      - Si OK: generar JWT (signado con secret)
+      - JWT contiene: userId, role, email, expiresAt (15 min)
+      - Retornar: { token, refreshToken, expiresIn }
+
+R4.2: POST /api/auth/refresh
+      - Input: refreshToken
+      - Validar que NO está en blacklist de tokens
+      - Validar firma + expiración (7 días)
+      - Si OK: generar nuevo JWT
+      - Retornar: { token, expiresIn }
+
+R4.3: POST /api/auth/logout
+      - Input: JWT + refreshToken
+      - Agregar ambos a tabla blacklist (TimestampToken)
+      - Retornar: { success: true }
+      - Cliente borra JWT localmente
+
+
+TABLAS NUEVAS (R4.x)
+====================
+
+Users:
+  id (UUID, pk)
+  email (STRING, unique, indexed)
+  password_hash (STRING, bcrypt)
+  role (ENUM: admin, staff)
+  active (BOOLEAN, default true)
+  createdAt (DATETIME)
+  createdBy (UUID fk users, nullable - quién lo creó)
+  
+  Índices:
+  - idx email (super rápido para login)
+  - idx role (buscar staff, admins)
+  - idx active (soft-delete)
+
+BlacklistedTokens / TimestampToken: (ya diseñada en R4.x)
+  id (CUID, pk)
+  token_hash (STRING, hash del JWT para no almacenar en claro)
+  userId (UUID fk users)
+  type (enum: access, refresh)
+  expiresAt (DATETIME)
+  createdAt (DATETIME)
+  reason (STRING: logout, password_change, etc)
+  
+  Índices:
+  - idx token_hash (búsqueda instantánea)
+  - idx expiresAt (cleanup automático)
+  - idx userId (ver sesiones de un usuario)
+
+
+MIDDLEWARE & ROUTE PROTECTION (R4.x)
+====================================
+
+→ Middleware: verifyJWT(req)
+   1. Extraer JWT de header Authorization: Bearer <token>
+   2. Validar firma + no expirado
+   3. Extraer payload: userId, role
+   4. Verificar userId NOT en blacklist
+   5. Retornar userId + role al handler
+
+→ Middleware: requireRole(roles: [])
+   1. Aplicar verifyJWT primero
+   2. Validar que usuario.role esté en roles permitidos
+   3. Si no: retornar 403 Forbidden
+   4. Si sí: continuar
+
+IMPLEMENTACIÓN:
+  - /api/orders [GET] → requireRole(['admin'])
+  - /api/orders [POST] → PÚBLICO (sin middleware)
+  - /api/orders/[code]/validate [POST] → requireRole(['admin'])
+  - /api/orders/[code]/deliver [POST] → requireRole(['staff'])
+  - /admin/* → requireRole(['admin'])
+  - /despacho/* → requireRole(['staff', 'admin'])
+  - /api/users/* → requireRole(['admin'])
+
+
+SEGURIDAD & ESCALABILIDAD
+==========================
+
+CONTRASEÑAS:
+  ✓ Usar bcrypt (npm: bcryptjs)
+  ✓ Costo: 12 (≈250ms por hash, good balance)
+  ✓ Nunca almacenar pass en claro
+  ✓ Hash password_hash cada vez que cambia
+
+JWT SECRETS:
+  ✓ Almacenar en .env.local (nunca en código)
+  ✓ Secret LARGO: random 32+ caracteres
+  ✓ Rotar cada 6 meses en producción
+  ✓ Access token: short-lived (15 min)
+  ✓ Refresh token: long-lived (7 días)
+  ✓ Refresh token SOLO via httpOnly cookie (si posible)
+
+RATE LIMITING (Global + Por Usuario):
+  ✓ PHASE 1 cubre por IP/email en compra
+  ✓ PHASE 4 agrega: /api/auth/login limitado (5 intentos / 15 min por IP)
+  ✓ Previene fuerza bruta contra admin/staff
+
+DATABASE SECURITY:
+  ✓ Supabase RLS (Row-Level Security) para users table
+  ✓ Admin solo ve su propio usuario + staff creados
+  ✓ Backups automáticas each 24h (Supabase)
+  ✓ Encrypted passwords at rest
+
+HTTPS & VERCEL:
+  ✓ Vercel SIEMPRE HTTPS (no permite HTTP)
+  ✓ Headers seguridad: HSTS, CSP, X-Frame-Options
+  ✓ Rate limit global en edge (Vercel+Cloudflare)
+  ✓ DDoS protection built-in
+
+ESCALABILIDAD (500-1000):
+  ✑ JWT es stateless → no necesita sessions en DB
+  ✑ Si 1000 usuarios concurrentes:
+    • Token verification: O(1) via JWT signature
+    • Blacklist check: O(1) via hash lookup + Redis cache opcional
+    • No bottleneck de sesiones
+  ✑ Supabase auto-escala (managed DB)
+  ✑ Vercel edge functions geo-distributed (baja latencia)
+  ✑ Token caching en cliente (localStorage) = menos peticiones
+
+
+CASOS EDGE & SEGURIDAD
+======================
+
+CASO: Admin pierde password
+  Solución: POST /api/auth/reset-password (envía email con link temporal)
+  - Link valido solo 30 min
+  - Reset token almacenado en DB con expiración
+  - Invalidar todas las sesiones del admin (logout all)
+
+CASO: Admin cierra sesión en todos lados (device compromised)
+  Solución: POST /api/auth/logout-all-devices
+  - Agregar TODOS los refresh tokens del usuario a blacklist
+  - Fuerza re-login en todos lados
+
+CASO: Token robado mientras se transmite
+  Riesgo: HTTPS mitiga 99%, pero JWT en header sigue visibleISO en cliente
+  Solución: 
+  - Usar httpOnly cookies (if possible) en lugar de localStorage
+  - Implementar CSRF protection
+  - Corta duración (15 min) limita daño
+
+CASO: Brute force contra /api/auth/login
+  Solución: Rate limit por IP (5 intentos / 15 min)
+  - Redis cache (opcional) para velocidad
+  - Log cada intento en security_logs (PHASE 3.1)
+  - Alert si >5 intentos fallidos
+
+CASO: Staff offline durante evento
+  Riesgo: Si WiFi cae, staff no puede marcar entregas
+  Solución:
+  - Offline mode: cachear últimos N códigos en local storage
+  - Cuando vuelve conexión: sincronizar automáticamente
+  - Validar que código no fue entregado 2x
+
+
+IMPLEMENTACION ORDER (PRIORITY):
+================================
+
+1. Crear Users + BlacklistedTokens tablas
+2. Funciones de auth en db.ts (createUser, getUserByEmail, blacklistToken, isTokenBlacklisted)
+3. POST /api/auth/login endpoint
+4. POST /api/auth/refresh endpoint
+5. POST /api/auth/logout endpoint
+6. Middleware verifyJWT + requireRole
+7. Proteger rutas admin y staff
+8. UI: Login page para admin/staff
+9. Storage: Guardar JWT en localStorage + logout handler
+10. Rate limiting en /api/auth/login
+
+
+================================================================================
+PHASE 5: Multi-Domain Landing & Marketing [ALTA PRIORIDAD - DESPUÉS PHASE 4]
+================================================================================
+
+CONTEXTO: Criar presencia empresarial separada de sistema de preventa
+- diezproducciones.ar → Landing page / Marketing
+- preventa.diezproducciones.ar → Sistema de preventa (PHASE 1-4)
+
+OBJETIVOS:
+- Imagen corporativa profesional
+- Hero section con evento principal + fecha
+- Landing optimizada para SEO
+- CTA claro hacia preventa
+- Info: Quiénes somos, eventos, blog
+
+
+ARQUITECTURA - OPCIÓN A (RECOMENDADA)
+======================================
+
+1. DOS PROYECTOS VERCEL (separados para escalabilidad)
+
+Proyecto 1: diezproducciones.ar (Landing/Marketing)
+  - Next.js 16
+  - StaticGeneration + ISR
+  - Optimizado para SEO (robots.txt, sitemap)
+  - Minimal API calls
+  - Lighthouse 90+
+  
+Proyecto 2: preventa.diezproducciones.ar (Sistema actual)
+  - Next.js 16 (codebase existente)
+  - API routes + protected endpoints
+  - Auth system (PHASE 4)
+  - Database heavy
+
+2. BASE DE DATOS (Compartida - Supabase única)
+
+Tables:
+  ✓ Orders, Products, SecurityLogs (existentes)
+  ✓ Users (PHASE 4)
+  ✓ Events (NEW) - info de eventos para landing
+    - id, name, date, location, description, hero_image
+    - capacity, current_registrations, status
+  ✓ Blog (NEW) - posts de noticias
+    - id, title, slug, excerpt, body, author_id, published_at
+
+3. DNS CONFIGURATION
+
+Registrar: Cualquier provider (Namecheap, GoDaddy, etc)
+  
+  diezproducciones.ar:
+    Type: A
+    Value: 76.76.19.163 (Vercel IP)
+  
+  preventa.diezproducciones.ar:
+    Type: CNAME
+    Value: cname.vercel-dns.com.
+  
+  *.diezproducciones.ar (wildcard):
+    Type: CNAME
+    Value: cname.vercel-dns.com.
+    (Cubre www, etc)
+
+
+LANDING PAGE STRUCTURE
+======================
+
+/
+  └ Homepage (Hero)
+     - Title: "AUTOS ROBADOS DIVA ROCK 2026"
+     - Subtitle: "Preventa oficial de bebidas"
+     - Countdown: "Evento en 45 días"
+     - CTA: "Comprar ahora" → preventa.diezproducciones.ar
+     - Hero image: Banner impactante del evento
+
+/about
+  └ Quiénes somos
+     - Historia de Diez Producciones
+     - Misión / Valores
+     - Team (opcional)
+     - Contacto
+
+/eventos
+  └ Eventos
+     - Próximos eventos (query desde DB Events table)
+     - Eventos pasados (archive)
+     - Detalles: fecha, lugar, capacidad
+     - Link a preventa por evento
+
+/blog
+  └ Blog / Noticias
+     - Listado de posts
+     - Filtrable por fecha/categoría
+     - Pagin pagination
+
+/[blog-slug]
+  └ Blog post individual
+     - Contenido completo
+     - Fecha, autor
+     - Comments (opcional)
+
+/contacto
+  └ Contacto
+     - Formulario simple (email, mensaje)
+     - Social media links
+     - Info de contacto
+
+SEO & OPTIMIZATION
+==================
+
+Robots.txt:
+  User-agent: *
+  Allow: /
+  Disallow: /admin, /despacho
+  Sitemap: /sitemap.xml
+
+Sitemap.xml:
+  - Dynamic: generar desde /about, /eventos, /blog posts
+  - Actualizar cada 24h (ISR)
+
+Meta Tags:
+  ✓ Title, Description, Keywords (cada página)
+  ✓ OG tags (Open Graph para social sharing)
+  ✓ Twitter cards
+  ✓ Canonical URLs
+
+Performance:
+  ✓ Image optimization (next/image)
+  ✓ CSS minification
+  ✓ Code splitting
+  ✓ Cache headers (Vercel edge)
+  ✓ CDN global (Vercel)
+
+Analytics:
+  ✓ Google Analytics ID (env var)
+  ✓ Eventos: Click "Comprar", form submit contacto
+  ✓ Conversion: Link preventa (track visits)
+
+
+DATABASE CHANGES (R5.x)
+=====================
+
+NEW TABLE: Events
+
+  id (UUID, pk)
+  name (STRING) - "AUTOS ROBADOS DIVA ROCK 2026"
+  slug (STRING, unique) - "autos-robados-2026"
+  date (DATE) - fecha del evento
+  location (STRING) - lugar
+  description (TEXT) - descripción larga
+  hero_image_url (STRING, nullable) - URL de imagen hero
+  capacity (INT, nullable) - capacidad total
+  current_registrations (INT, default 0) - órdenes confirmadas
+  status (ENUM: draft, upcoming, ongoing, past) - estado
+  createdAt, updatedAt (DATETIME)
+  
+  Índices:
+  - idx slug (buscar por slug)
+  - idx date (próximos eventos)
+  - idx status (filtrar)
+
+NEW TABLE: Blog (opcional para PHASE 5.2)
+
+  id (UUID, pk)
+  title (STRING)
+  slug (STRING, unique)
+  excerpt (TEXT, max 200 chars) - preview
+  body (TEXT) - contenido markdown
+  author_id (UUID fk users)
+  published_at (DATETIME, nullable)
+  createdAt, updatedAt (DATETIME)
+  
+  Índices:
+  - idx slug
+  - idx published_at (últimos posts)
+
+
+CODEBASE ORGANIZATION
+=====================
+
+Landing Project (diezproducciones.ar):
+  
+  src/
+    ├── pages/
+    │   ├── _app.tsx (Providers: Google Analytics, etc)
+    │   ├── index.tsx (Homepage)
+    │   ├── about.tsx (About)
+    │   ├── eventos.tsx (Events lista)
+    │   ├── eventos/[slug].tsx (Event detail)
+    │   ├── blog/index.tsx (Blog lista)
+    │   ├── blog/[slug].tsx (Post detail)
+    │   ├── contacto.tsx (Contact form)
+    │   └── 404.tsx
+    │
+    ├── api/
+    │   ├── supabase.ts (Shared Supabase client)
+    │   └── events.ts (GET /api/events - para ISR)
+    │
+    ├── components/
+    │   ├── Header.tsx
+    │   ├── Footer.tsx
+    │   ├── Hero.tsx
+    │   ├── EventCard.tsx
+    │   ├── BlogCard.tsx
+    │   └── ContactForm.tsx
+    │
+    ├── lib/
+    │   ├── supabase.ts (Shared DB queries)
+    │   ├── utils.ts (shared utilities)
+    │   └── types.ts (shared types)
+    │
+    ├── styles/
+    │   └── globals.css (Tailwind)
+    │
+    └── public/
+        ├── images/
+        ├── robots.txt
+        └── sitemap.xml (generated)
+
+Preventa Project (preventa.diezproducciones.ar):
+  - Codebase existente (PHASE 1-4)
+  - Puede importar tipos compartidos desde landing si necesita
+
+
+DEPLOYMENT FLOW
+===============
+
+1. Landing site updates:
+   git push → GitHub → Vercel (auto build)
+   Vercel invoca ISR en /api/events (cache 1h)
+   
+2. Sistema preventa updates:
+   git push → GitHub → Vercel (auto build)
+   Supabase sin cambios
+
+3. Event creation (admin):
+   Admin agrega evento en BD (Supabase)
+   Landing ISR refresh en next request o revalidate manual
+   
+4. Blog post publish:
+   Crear post en BD (Supabase)
+   Landing ISR revalidate /blog, /blog/[slug]
+
+
+MONITOREO & ANALÍTICA
+=====================
+
+Landing:
+  - Google Analytics: visitor count, top pages, conversion rate
+  - Sentry: error tracking (optional)
+
+Preventa:
+  - Supabase logs + SecurityLogs table (PHASE 3.1)
+  - Admin dashboard (future)
+
+Unified:
+  - Vercel Analytics: Core Web Vitals, performance
+  - Uptime monitoring (200ok.io, StatusPage)
+
+
+CASOS ESPECIALES
+================
+
+CASO: Evento pasa (date < now)
+  Status automático: upcoming → past
+  CTA landing cambia: "Comprar" → "Revivir (galería)"
+  Link preventa: viewable pero no para comprar (sold out)
+
+CASO: Capacidad alcanzada
+  Status: sold_out
+  Landing: "Agotado" en hero
+  Preventa: message "Capacidad alcanzada"
+
+CASO: Cambiar evento principal
+  Landing 404 → nuevo evento hero si slug cambia
+  Redirect o update link en home
+
+
+TIMING & DELIVERY
+=================
+
+FASE 5.1 (esta): Arquitectura + DB schema + landing structure (definido)
+FASE 5.2 (next): Implementación landing site
+  → New Vercel project
+  → Pages: home, about, eventos, blog, contacto
+  → UI design (separate con landing specialist)
+  → SEO postemplate
+  → Deploy + DNS setup
+
+FASE 5.3 (future): Integraciones
+  → CMS (Supabase, Contentful, Sanity)
+  → Email para contactos
+
+
+================================================================================
+NOTES OPERATIVAS
+================================================================================
+
+ADMIN TASKS:
+- Validar pagos en /admin
+- Ver órdenes pendientes, confirmadas, entregadas
+- No listar datos sensibles (comprobante viejo antes, ahora sí para validar)
+
+STAFF TASKS:
+- Buscar código en /despacho
+- Marcar como REDEEMED
+- No puede modificar orden
+
+SECURITY:
+- Nunca confiar en frontend para precios
+- Siempre recalcular en backend
+- Loguear intentos fallidos
+- Rate limit es defensa básica contra bots
+- Auth/infra security = PHASE 4 (después)
+
+PERFORMANCE:
+- Cache de productos: critical (no cambian)
+- Cache de órdenes: real-time es nice-to-have
+- DB queries: optimizar con indexes (ya hay: status, email, createdAt)
+
+================================================================================
+EOF
+
+- Auth/infra security = PHASE 4

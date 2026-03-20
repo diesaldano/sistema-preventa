@@ -15,6 +15,25 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                const theme = localStorage.getItem('preventa-theme') || 'light';
+                const html = document.documentElement;
+                if (theme === 'dark') {
+                  html.classList.add('dark');
+                  html.classList.remove('light');
+                } else {
+                  html.classList.add('light');
+                  html.classList.remove('dark');
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="antialiased">
         <ThemeProvider>
           <CartProvider>{children}</CartProvider>

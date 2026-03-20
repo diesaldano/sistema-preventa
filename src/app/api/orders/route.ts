@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateOrderCode, isValidEmail, isValidPhone } from '@/lib/utils';
-import { Order } from '@/lib/types';
+import { Order, OrderStatus } from '@/lib/types';
 
 export async function GET(request: NextRequest) {
   try {
@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
 
     const code = generateOrderCode();
     const now = new Date();
+    const status: OrderStatus = comprobante ? 'PAYMENT_REVIEW' : 'PENDING_PAYMENT';
     const order: Order = {
       code,
       customerName: name,
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
         price: typeof item.price === 'string' ? parseInt(item.price, 10) : item.price,
       })),
       total,
-      status: comprobante ? 'PAYMENT_REVIEW' : 'PENDING_PAYMENT',
+      status,
       comprobante: comprobante || undefined,
       comprobanteMime: comprobanteMime || undefined,
       createdAt: now,

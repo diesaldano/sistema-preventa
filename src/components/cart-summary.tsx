@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCart } from '@/lib/cart-context';
 import { useTheme } from '@/lib/theme-context';
+import { formatPrice } from '@/lib/utils';
 
 export function CartSummary() {
   const { items, total, clearCart } = useCart();
@@ -27,10 +28,7 @@ export function CartSummary() {
     );
   }
 
-  const priceDisplay = (total / 1000).toLocaleString('es-AR', { 
-    minimumFractionDigits: 0, 
-    maximumFractionDigits: 0 
-  });
+  const priceDisplay = formatPrice(total);
 
   return (
     <div className={`rounded-lg border p-5 shadow-lg sticky top-24 transition-colors ${
@@ -52,15 +50,7 @@ export function CartSummary() {
       {/* Items List */}
       <div className="space-y-2 mb-5 max-h-60 overflow-y-auto scrollbar-hide">
         {items.map((item) => {
-          const itemTotal = (item.price * item.quantity) / 1000;
-          const unitPrice = (item.price / 1000).toLocaleString('es-AR', { 
-            minimumFractionDigits: 0, 
-            maximumFractionDigits: 0 
-          });
-          const itemTotalDisplay = itemTotal.toLocaleString('es-AR', { 
-            minimumFractionDigits: 0, 
-            maximumFractionDigits: 0 
-          });
+          const itemTotalPrice = item.price * item.quantity;
 
           return (
             <div
@@ -78,7 +68,7 @@ export function CartSummary() {
                 <p className={`mt-0.5 ${
                   isDark ? 'text-slate-500' : 'text-slate-600'
                 }`}>
-                  {item.quantity}x ${unitPrice}
+                  {item.quantity}x {formatPrice(item.price)}
                 </p>
               </div>
               <p className={`font-bold ml-2 flex-shrink-0 text-sm ${
@@ -86,7 +76,7 @@ export function CartSummary() {
                     ? 'text-amber-500 font-medium'
                     : 'text-amber-700 font-medium'
               }`}>
-                ${itemTotalDisplay}
+                {formatPrice(itemTotalPrice)}
               </p>
             </div>
           );
@@ -103,7 +93,7 @@ export function CartSummary() {
             <p className={`text-2xl font-bold ${
               isDark ? 'text-amber-500' : 'text-amber-600'
             }`}>
-              ${priceDisplay}
+              {priceDisplay}
             </p>
             <p className={`text-xs mt-0.5 ${
               isDark ? 'text-slate-500' : 'text-slate-600'

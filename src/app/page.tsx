@@ -15,9 +15,11 @@ export default function Home() {
 
   const categories = [
     { id: 'all', label: 'Todos' },
+    { id: 'bebidas', label: 'Bebidas' },
     { id: 'cerveza', label: 'Cerveza' },
-    { id: 'fernet', label: 'Fernet' },
-    { id: 'combinado', label: 'Combinados' },
+    { id: 'merch', label: 'Merch' },
+    { id: 'entrada', label: 'Entrada' },
+    { id: 'combo', label: 'Combos' },
   ];
 
   const filteredProducts = selectedCategory === 'all' 

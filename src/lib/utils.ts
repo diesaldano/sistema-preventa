@@ -9,11 +9,14 @@ export function generateOrderCode(): string {
 
 /**
  * Format price to peso currency
+ * Price is stored directly in ARS pesos (e.g., 6000 = $6.000)
  */
 export function formatPrice(price: number): string {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency: 'ARS',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(price);
 }
 

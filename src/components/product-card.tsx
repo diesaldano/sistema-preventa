@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Product } from '@/lib/types';
 import { useCart } from '@/lib/cart-context';
 import { useTheme } from '@/lib/theme-context';
+import { formatPrice } from '@/lib/utils';
 
 // Obtener emoji según categoría
 function getCategoryEmoji(category: string): string {
@@ -42,10 +43,7 @@ export function ProductCard({ product }: { product: Product }) {
 
   const isOutOfStock = product.stock === 0;
   const emoji = getCategoryEmoji(product.category);
-  const priceDisplay = (product.price / 1000).toLocaleString('es-AR', { 
-    minimumFractionDigits: 0, 
-    maximumFractionDigits: 0 
-  });
+  const priceDisplay = formatPrice(product.price);
 
   const isDark = theme === 'dark';
 
@@ -125,7 +123,7 @@ export function ProductCard({ product }: { product: Product }) {
           <p className={`font-bold text-lg ${
             isDark ? 'text-blue-400 font-medium' : 'text-blue-600 font-medium'
           }`}>
-            ${priceDisplay}
+            {priceDisplay}
           </p>
         </div>
 

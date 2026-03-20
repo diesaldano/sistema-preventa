@@ -12,14 +12,14 @@ type ThemeContextType = {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
 
   // Aplicar tema al cargar la página
   useEffect(() => {
     const htmlElement = document.documentElement;
     const savedTheme = localStorage.getItem('preventa-theme') as Theme | null;
-    const initialTheme = savedTheme || 'dark';
+    const initialTheme = savedTheme || 'light';
     
     setTheme(initialTheme);
     

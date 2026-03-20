@@ -141,37 +141,37 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
           </Link>
         </div>
 
-        <div className="rounded-lg border border-slate-800 bg-slate-900 p-6 shadow-lg shadow-slate-900/40">
+        <div className={`rounded-lg border p-6 shadow-lg transition-colors ${isDark ? 'border-slate-800 bg-slate-900 shadow-slate-900/40' : 'border-slate-200 bg-slate-50 shadow-slate-300/20'}`}>
           {/* Estado */}
-          <div className="mb-6 pb-6 border-b border-slate-800">
+          <div className={`mb-6 pb-6 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
             <div className={`inline-block px-4 py-2 rounded-lg border font-medium text-sm ${getStatusBadgeColor(order.status)}`}>
               {getStatusText(order.status)}
             </div>
           </div>
 
           {/* Código y Detalles */}
-          <div className="mb-6 pb-6 border-b border-slate-800">
-            <p className="text-sm text-slate-400 mb-2">Código de Retiro</p>
-            <p className="text-5xl font-bebas font-bold text-amber-400 mb-6 tracking-widest">
+          <div className={`mb-6 pb-6 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+            <p className={`text-sm mb-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Código de Retiro</p>
+            <p className={`text-5xl font-bebas font-bold mb-6 tracking-widest ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
               {order.code}
             </p>
 
             <div className="grid gap-4 sm:grid-cols-2 text-sm">
               <div>
-                <p className="text-slate-400">Nombre</p>
-                <p className="font-medium text-slate-100">{order.customerName}</p>
+                <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>Nombre</p>
+                <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{order.customerName}</p>
               </div>
               <div>
-                <p className="text-slate-400">Email</p>
-                <p className="font-medium text-slate-100">{order.customerEmail}</p>
+                <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>Email</p>
+                <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{order.customerEmail}</p>
               </div>
               <div>
-                <p className="text-slate-400">Teléfono</p>
-                <p className="font-medium text-slate-100">{order.customerPhone}</p>
+                <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>Teléfono</p>
+                <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{order.customerPhone}</p>
               </div>
               <div>
-                <p className="text-slate-400">Fecha</p>
-                <p className="font-medium text-slate-100">
+                <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>Fecha</p>
+                <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
                   {new Date(order.createdAt).toLocaleDateString('es-AR')}
                 </p>
               </div>
@@ -179,18 +179,18 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
           </div>
 
           {/* Productos */}
-          <div className="mb-6 pb-6 border-b border-slate-800">
-            <h3 className="font-semibold text-slate-100 mb-4">Productos</h3>
+          <div className={`mb-6 pb-6 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+            <h3 className={`font-semibold mb-4 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Productos</h3>
             <div className="space-y-3">
               {order.items.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between text-sm bg-slate-800/50 border border-slate-800 p-3 rounded">
+                <div key={idx} className={`flex items-center justify-between text-sm border p-3 rounded transition-colors ${isDark ? 'bg-slate-800/50 border-slate-800' : 'bg-slate-100 border-slate-200'}`}>
                   <div>
-                    <p className="font-medium text-slate-100">Producto #{idx + 1}</p>
-                    <p className="text-xs text-slate-400">{item.productId}</p>
+                    <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Producto #{idx + 1}</p>
+                    <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{item.productId}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-slate-100">x{item.quantity}</p>
-                    <p className="text-xs text-amber-400">{formatPrice(item.unitPrice)}</p>
+                    <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>x{item.quantity}</p>
+                    <p className={isDark ? 'text-xs text-amber-400' : 'text-xs text-amber-600'}>{formatPrice(item.unitPrice)}</p>
                   </div>
                 </div>
               ))}
@@ -199,34 +199,34 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
 
           {/* Total */}
           <div className="flex items-center justify-between mb-6">
-            <p className="text-lg font-semibold text-slate-100">Total</p>
-            <p className="text-2xl font-bold font-bebas text-amber-400 tracking-wide">{formatPrice(order.total)}</p>
+            <p className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>Total</p>
+            <p className={`text-2xl font-bold font-bebas tracking-wide ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{formatPrice(order.total)}</p>
           </div>
 
           {/* Mensaje según estado */}
-          <div className="rounded-lg bg-slate-800/50 border border-slate-800 p-4 text-center">
+          <div className={`rounded-lg border p-4 text-center transition-colors ${isDark ? 'bg-slate-800/50 border-slate-800' : 'bg-amber-50 border-amber-200'}`}>
             {order.status === 'PENDING_PAYMENT' ? (
-              <p className="text-yellow-300 font-medium">
+              <p className={isDark ? 'text-yellow-300 font-medium' : 'text-yellow-700 font-medium'}>
                 Tu pedido está pendiente de pago. Por favor realiza la transferencia bancaria.
               </p>
             ) : order.status === 'PAYMENT_REVIEW' ? (
-              <p className="text-amber-300 font-medium">
+              <p className={isDark ? 'text-amber-300 font-medium' : 'text-amber-700 font-medium'}>
                 Tu pago ya fue recibido. Nuestro equipo está revisándolo. Te notificaremos pronto.
               </p>
             ) : order.status === 'PAID' ? (
-              <p className="text-emerald-300 font-medium">
+              <p className={isDark ? 'text-emerald-300 font-medium' : 'text-emerald-700 font-medium'}>
                 ¡Pago confirmado! Tu pedido está listo. Presenta el código <span className="font-bebas font-bold text-lg tracking-wide">{order.code}</span> el día del evento para retirar.
               </p>
             ) : order.status === 'REDEEMED' ? (
-              <p className="text-blue-300 font-medium">
+              <p className={isDark ? 'text-blue-300 font-medium' : 'text-blue-700 font-medium'}>
                 ✓ Tu pedido fue retirado exitosamente. ¡Gracias por tu compra!
               </p>
             ) : order.status === 'CANCELLED' ? (
-              <p className="text-red-300 font-medium">
+              <p className={isDark ? 'text-red-300 font-medium' : 'text-red-700 font-medium'}>
                 ✗ Tu pedido ha sido cancelado. Por favor contacta con nosotros si tienes dudas.
               </p>
             ) : (
-              <p className="text-slate-300 font-medium">
+              <p className={isDark ? 'text-slate-300 font-medium' : 'text-slate-700 font-medium'}>
                 Estado: {getStatusText(order.status)}
               </p>
             )}

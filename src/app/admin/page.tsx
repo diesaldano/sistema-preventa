@@ -56,8 +56,9 @@ export default function AdminPage() {
         throw new Error('Error al validar');
       }
 
-      await fetchOrders();
-      alert('¡Pedido validado!');
+      setOrders((prev) =>
+        prev.map((o) => (o.code === code ? { ...o, status: 'PAID' } : o))
+      );
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error');
     } finally {
@@ -78,8 +79,9 @@ export default function AdminPage() {
         throw new Error('Error al rechazar');
       }
 
-      await fetchOrders();
-      alert('¡Pedido rechazado!');
+      setOrders((prev) =>
+        prev.map((o) => (o.code === code ? { ...o, status: 'CANCELLED' } : o))
+      );
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error');
     } finally {

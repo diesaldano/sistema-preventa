@@ -33,7 +33,7 @@ export function BrandHeader({
                   {/* Diez Logo - Más grande */}
                   <div className="relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0">
                     <Image
-                      src={theme === 'light' ? '/diez.png' : '/diezb.png'}
+                      src={theme === 'light' ? '/diezb.png' : '/diez.png'}
                       alt="Diez Producciones"
                       fill
                       className="object-contain"

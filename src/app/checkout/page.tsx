@@ -212,7 +212,9 @@ export default function CheckoutPage() {
                 </div>
                 <form className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-slate-200 mb-2">
+                    <label className={`block text-sm font-medium mb-2 ${
+                      isDark ? 'text-slate-200' : 'text-slate-700'
+                    }`}>
                       Nombre Completo
                     </label>
                     <input
@@ -228,7 +230,9 @@ export default function CheckoutPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-200 mb-2">Email</label>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      isDark ? 'text-slate-200' : 'text-slate-700'
+                    }`}>Email</label>
                     <input
                       type="email"
                       value={formData.email}
@@ -242,7 +246,9 @@ export default function CheckoutPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-200 mb-2">Teléfono</label>
+                    <label className={`block text-sm font-medium mb-2 ${
+                      isDark ? 'text-slate-200' : 'text-slate-700'
+                    }`}>Teléfono</label>
                     <input
                       type="tel"
                       value={formData.phone}
@@ -290,52 +296,55 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <p className={`text-sm font-medium mb-3 ${
-                    isDark ? 'text-slate-200' : 'text-slate-700'
+                    isDark ? 'text-slate-200' : 'text-slate-900'
                   }`}>Transferir A:</p>
-                  <div className={`rounded-lg border p-4 space-y-2 font-mono text-sm transition-colors ${
+                  <div className={`rounded-lg border p-5 space-y-4 font-mono text-sm font-bold transition-colors ${
                     isDark
                       ? 'border-slate-800 bg-slate-800/40'
-                      : 'border-slate-300 bg-slate-100'
+                      : 'border-amber-300 bg-amber-50'
                   }`}>
                     <div>
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Alias:</span>{' '}
-                      <span className={`font-semibold ${
-                        isDark ? 'text-slate-100' : 'text-slate-900'
-                      }`}>{BANK_DATA.alias}</span>
+                      <span className={`text-xs font-normal uppercase tracking-wide ${
+                        isDark ? 'text-slate-400' : 'text-slate-700'
+                      }`}>Alias</span>
+                      <div className={`text-2xl font-mono font-bold mt-1 ${
+                        isDark ? 'text-blue-400' : 'text-blue-600'
+                      }`}>{BANK_DATA.alias}</div>
                     </div>
                     <div>
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>CBU:</span>{' '}
-                      <span className={`font-semibold break-all ${
-                        isDark ? 'text-slate-100' : 'text-slate-900'
-                      }`}>{BANK_DATA.cbu}</span>
+                      <span className={`text-xs font-normal uppercase tracking-wide ${
+                        isDark ? 'text-slate-400' : 'text-slate-700'
+                      }`}>CBU</span>
+                      <div className={`text-lg font-mono font-bold mt-1 break-all ${
+                        isDark ? 'text-amber-300' : 'text-amber-700'
+                      }`}>{BANK_DATA.cbu}</div>
                     </div>
                     <div>
-                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Banco:</span>{' '}
-                      <span className={`font-semibold ${
-                        isDark ? 'text-slate-100' : 'text-slate-900'
-                      }`}>{BANK_DATA.bank}</span>
+                      <span className={`text-xs font-normal uppercase tracking-wide ${
+                        isDark ? 'text-slate-400' : 'text-slate-700'
+                      }`}>Banco</span>
+                      <div className={isDark ? 'text-slate-300 mt-1' : 'text-slate-800 mt-1 font-semibold'}>{BANK_DATA.bank}</div>
                     </div>
                   </div>
                 </div>
                 <div>
                   <p className={`text-sm font-medium mb-3 ${
-                    isDark ? 'text-slate-200' : 'text-slate-700'
+                    isDark ? 'text-slate-200' : 'text-slate-900'
                   }`}>Monto Exacto:</p>
                   <div className={`rounded-lg border p-4 space-y-2 transition-colors ${
                     isDark
                       ? 'border-blue-500/30 bg-blue-500/10'
-                      : 'border-blue-300 bg-blue-100/50'
+                      : 'border-amber-300 bg-amber-50'
                   }`}>
-                    <div className={`text-2xl font-bold ${
-                      isDark ? 'text-blue-400' : 'text-blue-600'
+                    <div className={`text-3xl font-bold ${
+                      isDark ? 'text-blue-400' : 'text-amber-700'
                     }`}>{formatPrice(total)}</div>
                     <div className={`flex gap-2 text-xs ${
-                      isDark ? 'text-blue-300' : 'text-blue-700'
+                      isDark ? 'text-blue-300' : 'text-amber-700'
                     }`}>
                       <AlertCircle size={16} className="flex-shrink-0" />
                       <p>
-                        <strong>IMPORTANTE:</strong> Transferir el monto EXACTO para validar tu
-                        pago automáticamente
+                        <strong>IMPORTANTE:</strong> Transferir el monto EXACTO para validar tu pago automáticamente
                       </p>
                     </div>
                   </div>
@@ -525,83 +534,135 @@ export default function CheckoutPage() {
             )}
 
             {currentStep === 4 && (
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-8 space-y-6">
+              <div className={`rounded-lg border p-8 space-y-6 transition-colors ${
+                isDark
+                  ? 'border-emerald-500/30 bg-emerald-500/5'
+                  : 'border-emerald-300 bg-emerald-50'
+              }`}>
                 <div className="text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/30 mb-4">
-                    <CheckCircle className="text-emerald-400" size={32} />
+                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full border mb-4 transition-colors ${
+                    isDark
+                      ? 'bg-emerald-500/20 border-emerald-500/30'
+                      : 'bg-emerald-100 border-emerald-300'
+                  }`}>
+                    <CheckCircle className={isDark ? 'text-emerald-400' : 'text-emerald-600'} size={32} />
                   </div>
-                  <h2 className="text-2xl font-semibold text-slate-100">
+                  <h2 className={`text-2xl font-semibold ${
+                    isDark ? 'text-slate-100' : 'text-slate-900'
+                  }`}>
                     ¡Listo! Tu Pedido está Registrado
                   </h2>
-                  <div className="mt-4 border-b border-emerald-500/30" />
+                  <div className={`mt-4 border-b ${
+                    isDark ? 'border-emerald-500/30' : 'border-emerald-300'
+                  }`} />
                 </div>
-                <div className="rounded-lg bg-slate-900/50 border border-emerald-500/30 p-6 text-center">
-                  <p className="text-sm text-slate-400 mb-2">Tu Código de Retiro:</p>
-                  <div className="text-4xl font-mono font-bold text-amber-400 tracking-wider">
+                <div className={`rounded-lg border p-6 text-center transition-colors ${
+                  isDark
+                    ? 'bg-slate-900/50 border-emerald-500/30'
+                    : 'bg-white border-emerald-200'
+                }`}>
+                  <p className={`text-sm mb-2 font-medium ${
+                    isDark ? 'text-slate-400' : 'text-slate-600'
+                  }`}>Tu Código de Retiro:</p>
+                  <div className={`text-4xl font-mono font-bold tracking-wider ${
+                    isDark ? 'text-amber-400' : 'text-amber-600'
+                  }`}>
                     {orderCode}
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-200 mb-3">Resumen de tu Pedido:</p>
-                  <div className="rounded-lg border border-emerald-500/30 bg-slate-900/50 p-4 space-y-3 text-sm">
-                    <div className="grid grid-cols-2 gap-4 pb-3 border-b border-emerald-500/20">
+                  <p className={`text-sm font-medium mb-3 ${
+                    isDark ? 'text-slate-200' : 'text-slate-700'
+                  }`}>Resumen de tu Pedido:</p>
+                  <div className={`rounded-lg border p-4 space-y-3 text-sm transition-colors ${
+                    isDark
+                      ? 'border-emerald-500/30 bg-slate-900/50'
+                      : 'border-emerald-200 bg-white'
+                  }`}>
+                    <div className={`grid grid-cols-2 gap-4 pb-3 border-b ${
+                      isDark ? 'border-emerald-500/20' : 'border-emerald-200'
+                    }`}>
                       <div>
-                        <span className="text-slate-400">Cliente:</span>
-                        <p className="font-medium text-slate-100">{formData.name}</p>
+                        <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Cliente:</span>
+                        <p className={`font-medium ${
+                          isDark ? 'text-slate-100' : 'text-slate-900'
+                        }`}>{formData.name}</p>
                       </div>
                       <div>
-                        <span className="text-slate-400">Email:</span>
-                        <p className="font-medium text-slate-100">{formData.email}</p>
+                        <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Email:</span>
+                        <p className={`font-medium ${
+                          isDark ? 'text-slate-100' : 'text-slate-900'
+                        }`}>{formData.email}</p>
                       </div>
                     </div>
                     <div>
-                      <span className="text-slate-400">Teléfono:</span>
-                      <p className="font-medium text-slate-100">{formData.phone}</p>
+                      <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Teléfono:</span>
+                      <p className={`font-medium ${
+                        isDark ? 'text-slate-100' : 'text-slate-900'
+                      }`}>{formData.phone}</p>
                     </div>
-                    <div className="border-t border-emerald-500/20 pt-3 space-y-1">
+                    <div className={`border-t pt-3 space-y-1 ${
+                      isDark ? 'border-emerald-500/20' : 'border-emerald-200'
+                    }`}>
                       {items.map((item) => (
                         <div key={item.productId} className="flex justify-between">
-                          <span className="text-slate-300">{item.quantity}x {item.name}</span>
-                          <span className="font-medium text-slate-100">
+                          <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{item.quantity}x {item.name}</span>
+                          <span className={`font-medium ${
+                            isDark ? 'text-slate-100' : 'text-slate-900'
+                          }`}>
                             {formatPrice(item.price * item.quantity)}
                           </span>
                         </div>
                       ))}
                     </div>
-                    <div className="border-t border-emerald-500/20 pt-3 flex justify-between font-bold text-base">
-                      <span className="text-slate-100">TOTAL:</span>
-                      <span className="text-amber-400 font-medium text-lg">{formatPrice(total)}</span>
+                    <div className={`border-t pt-3 flex justify-between font-bold text-base transition-colors ${
+                      isDark ? 'border-emerald-500/20' : 'border-emerald-200'
+                    }`}>
+                      <span className={isDark ? 'text-slate-100' : 'text-slate-900'}>TOTAL:</span>
+                      <span className={`font-medium text-lg ${
+                        isDark ? 'text-amber-400' : 'text-amber-600'
+                      }`}>{formatPrice(total)}</span>
                     </div>
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2 text-center font-medium text-amber-300">
+                    <div className={`rounded px-3 py-2 text-center font-medium transition-colors ${
+                      isDark
+                        ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300'
+                        : 'bg-amber-100 border border-amber-300 text-amber-800'
+                    }`}>
                       Estado: PENDIENTE VALIDACIÓN
                     </div>
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-200 mb-3">Próximos Pasos:</p>
+                  <p className={`text-sm font-medium mb-3 ${
+                    isDark ? 'text-slate-200' : 'text-slate-700'
+                  }`}>Próximos Pasos:</p>
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2">
-                      <CheckCircle className="text-emerald-400 flex-shrink-0" size={18} />
-                      <span className="text-slate-300">Recibiremos tu transferencia</span>
+                      <CheckCircle className={isDark ? 'text-emerald-400' : 'text-emerald-600'} size={18} />
+                      <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Recibiremos tu transferencia</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <CheckCircle className="text-emerald-400 flex-shrink-0" size={18} />
-                      <span className="text-slate-300">Validaremos tu pago (puede tardar 24hs)</span>
+                      <CheckCircle className={isDark ? 'text-emerald-400' : 'text-emerald-600'} size={18} />
+                      <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Validaremos tu pago (puede tardar 24hs)</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <CheckCircle className="text-emerald-400 flex-shrink-0" size={18} />
-                      <span className="text-slate-300">Te confirmaremos por email</span>
+                      <CheckCircle className={isDark ? 'text-emerald-400' : 'text-emerald-600'} size={18} />
+                      <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Te confirmaremos por email</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <CheckCircle className="text-emerald-400 flex-shrink-0" size={18} />
-                      <span className="text-slate-300">Retira tu pedido el día del evento con este código</span>
+                      <CheckCircle className={isDark ? 'text-emerald-400' : 'text-emerald-600'} size={18} />
+                      <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>Retira tu pedido el día del evento con este código</span>
                     </li>
                   </ul>
                 </div>
                 <div className="pt-4 flex justify-center">
                   <button
                     onClick={handleViewOrder}
-                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 px-8 py-2 text-sm font-semibold text-slate-950 transition"
+                    className={`inline-flex items-center gap-2 rounded-lg px-8 py-2 text-sm font-semibold transition ${
+                      isDark
+                        ? 'bg-emerald-500 hover:bg-emerald-600 text-slate-950'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
                   >
                     Ver Estado de Mi Pedido →
                   </button>

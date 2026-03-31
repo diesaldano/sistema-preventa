@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/lib/cart-context';
@@ -13,15 +13,10 @@ import {
   sanitizeName,
   isValidComprobante
 } from '@/lib/utils';
+import { BANK_DATA, CHECKOUT_CONFIG } from '@/lib/constants';
 import CheckoutStepper from '@/components/checkout-stepper';
-import { AlertCircle, Upload, X, CheckCircle } from 'lucide-react';
+import { AlertCircle, Upload, X, CheckCircle, Clock } from 'lucide-react';
 import { BrandHeader } from '@/components/brand-header';
-
-const BANK_DATA = {
-  alias: 'diez.producciones',
-  cbu: '0140123456789012345678',
-  bank: 'XYZ Bank',
-};
 
 const STEPS = [
   { id: 1, label: 'Datos Personales' },
@@ -29,6 +24,39 @@ const STEPS = [
   { id: 3, label: 'Comprobante' },
   { id: 4, label: 'Confirmación' },
 ];
+
+// Componente para carrito vacío
+function EmptyCartView({ isDark }: { isDark: boolean }) {
+  return (
+    <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
+      <BrandHeader event="Carrito Vacío" subtitle="Preventa oficial de bebidas" />
+      <div className="mx-auto max-w-3xl px-6 py-12">
+        <section className={`w-full rounded-lg border p-8 text-center transition-colors ${
+          isDark
+            ? 'border-slate-800 bg-slate-900'
+            : 'border-slate-200 bg-slate-50'
+        }`}>
+          <h2 className={`text-2xl font-semibold ${
+            isDark ? 'text-slate-100' : 'text-slate-900'
+          }`}>Tu carrito está vacío</h2>
+          <p className={`mt-2 ${
+            isDark ? 'text-slate-400' : 'text-slate-600'
+          }`}>Debes agregar productos antes de continuar</p>
+          <Link
+            href="/"
+            className={`mt-6 inline-flex items-center justify-center rounded-lg px-6 py-2 text-sm font-semibold transition ${
+              isDark
+                ? 'bg-slate-800 hover:bg-slate-700 text-white'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            Volver a la Tienda
+          </Link>
+        </section>
+      </div>
+    </main>
+  );
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -41,6 +69,8 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderCode, setOrderCode] = useState<string | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState<number>(CHECKOUT_CONFIG.TRANSFER_TIMEOUT_MS);
+  const [step2StartTime, setStep2StartTime] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -50,38 +80,6 @@ export default function CheckoutPage() {
 
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-  if (items.length === 0) {
-    return (
-      <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
-        <BrandHeader event="Carrito Vacío" subtitle="Preventa oficial de bebidas" />
-        <div className="mx-auto max-w-3xl px-6 py-12">
-          <section className={`w-full rounded-lg border p-8 text-center transition-colors ${
-            isDark
-              ? 'border-slate-800 bg-slate-900'
-              : 'border-slate-200 bg-slate-50'
-          }`}>
-            <h2 className={`text-2xl font-semibold ${
-              isDark ? 'text-slate-100' : 'text-slate-900'
-            }`}>Tu carrito está vacío</h2>
-            <p className={`mt-2 ${
-              isDark ? 'text-slate-400' : 'text-slate-600'
-            }`}>Debes agregar productos antes de continuar</p>
-            <Link
-              href="/"
-              className={`mt-6 inline-flex items-center justify-center rounded-lg px-6 py-2 text-sm font-semibold transition ${
-                isDark
-                  ? 'bg-slate-800 hover:bg-slate-700 text-white'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              }`}
-            >
-              Volver a la Tienda
-            </Link>
-          </section>
-        </div>
-      </main>
-    );
-  }
 
   // ============================================================
   // Validación Frontend Consistente con Backend (R1.1)
@@ -123,6 +121,34 @@ export default function CheckoutPage() {
 
   const isStep1Valid = nameValidation.valid && emailValidation.valid && phoneValidation.valid;
 
+  // Timer para el step 2 (transferencia)
+  useEffect(() => {
+    if (currentStep !== 2) return;
+
+    if (!step2StartTime) {
+      setStep2StartTime(Date.now());
+      setTimeRemaining(CHECKOUT_CONFIG.TRANSFER_TIMEOUT_MS);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - step2StartTime;
+      const remaining = Math.max(0, CHECKOUT_CONFIG.TRANSFER_TIMEOUT_MS - elapsed);
+      setTimeRemaining(remaining);
+
+      if (remaining === 0) {
+        clearInterval(interval);
+        setError('El tiempo para transferir ha expirado. Por favor, intenta nuevamente.');
+        setCurrentStep(1);
+        setFormData({ name: '', email: '', phone: '' });
+        setStep2StartTime(null);
+        clearCart();
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [currentStep, step2StartTime, clearCart]);
+
   const handleNextStep = async () => {
     setError(null);
     if (currentStep === 1) {
@@ -142,6 +168,7 @@ export default function CheckoutPage() {
       setCurrentStep(2);
     } else if (currentStep === 2) {
       setCurrentStep(3);
+      setStep2StartTime(null);
     } else if (currentStep === 3) {
       await handleCreateOrder();
     }
@@ -246,7 +273,10 @@ export default function CheckoutPage() {
     }
   };
 
-  return (
+  // Renderización condicional sin early returns
+  return items.length === 0 ? (
+    <EmptyCartView isDark={isDark} />
+  ) : (
     <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
       <BrandHeader event="Completa tu Pedido" subtitle="Preventa oficial de bebidas" />
 
@@ -349,17 +379,53 @@ export default function CheckoutPage() {
                   : 'border-slate-200 bg-white'
               }`}>
                 <div>
-                  <h2 className={`mb-2 text-xl font-semibold ${
-                    isDark ? 'text-slate-100' : 'text-slate-900'
-                  }`}>
-                    Realiza tu Transferencia Bancaria
-                  </h2>
-                  <div className={`mb-6 border-b pb-4 ${
-                    isDark ? 'border-slate-800' : 'border-slate-200'
-                  }`}>
-                    <div className={`h-1 w-24 rounded ${
-                      isDark ? 'bg-slate-700' : 'bg-blue-600'
-                    }`} />
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className={`mb-2 text-xl font-semibold ${
+                        isDark ? 'text-slate-100' : 'text-slate-900'
+                      }`}>
+                        Realiza tu Transferencia Bancaria
+                      </h2>
+                      <div className={`mb-6 border-b pb-4 ${
+                        isDark ? 'border-slate-800' : 'border-slate-200'
+                      }`}>
+                        <div className={`h-1 w-24 rounded ${
+                          isDark ? 'bg-slate-700' : 'bg-blue-600'
+                        }`} />
+                      </div>
+                    </div>
+                    {/* Timer */}
+                    <div className={`flex items-center gap-3 rounded-lg px-4 py-3 border-2 ${
+                      timeRemaining < 60000 && timeRemaining > 0
+                        ? isDark 
+                          ? 'border-red-500/50 bg-red-500/10'
+                          : 'border-red-400/50 bg-red-100/50'
+                        : timeRemaining === 0
+                        ? isDark
+                          ? 'border-red-500 bg-red-500/20'
+                          : 'border-red-500 bg-red-200'
+                        : isDark
+                        ? 'border-amber-500/30 bg-amber-500/10'
+                        : 'border-amber-300 bg-amber-50'
+                    }`}>
+                      <Clock size={20} className={
+                        timeRemaining < 60000 && timeRemaining > 0
+                          ? isDark ? 'text-red-400' : 'text-red-600'
+                          : timeRemaining === 0
+                          ? isDark ? 'text-red-400' : 'text-red-600'
+                          : isDark ? 'text-amber-400' : 'text-amber-600'
+                      } />
+                      <div className={`text-sm font-bold text-right ${
+                        timeRemaining < 60000 && timeRemaining > 0
+                          ? isDark ? 'text-red-400' : 'text-red-600'
+                          : timeRemaining === 0
+                          ? isDark ? 'text-red-400' : 'text-red-600'
+                          : isDark ? 'text-amber-400' : 'text-amber-600'
+                      }`}>
+                        <div>{Math.floor(timeRemaining / 60000).toString().padStart(2, '0')}:{Math.floor((timeRemaining % 60000) / 1000).toString().padStart(2, '0')}</div>
+                        {timeRemaining === 0 && <div className="text-xs">¡Tiempo agotado!</div>}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -371,6 +437,14 @@ export default function CheckoutPage() {
                       ? 'border-slate-800 bg-slate-800/40'
                       : 'border-amber-300 bg-amber-50'
                   }`}>
+                    <div>
+                      <span className={`text-xs font-normal uppercase tracking-wide ${
+                        isDark ? 'text-slate-400' : 'text-slate-700'
+                      }`}>Titular</span>
+                      <div className={`text-lg font-bold mt-1 ${
+                        isDark ? 'text-slate-300' : 'text-slate-800'
+                      }`}>{BANK_DATA.titular}</div>
+                    </div>
                     <div>
                       <span className={`text-xs font-normal uppercase tracking-wide ${
                         isDark ? 'text-slate-400' : 'text-slate-700'

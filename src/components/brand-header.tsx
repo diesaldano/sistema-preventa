@@ -10,7 +10,7 @@ interface BrandHeaderProps {
 }
 
 export function BrandHeader({
-  event = "Preventa DIVA ROCK 2025",
+  event = "Preventa DIVA ROCK",
   subtitle = "Preventa oficial de bebidas",
   showLogo = true,
 }: BrandHeaderProps) {
@@ -19,9 +19,14 @@ export function BrandHeader({
   return (
     <div className={`border-b transition-all duration-300 ${
       theme === 'light'
-        ? 'border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100'
-        : 'border-slate-800 bg-gradient-to-b from-slate-900/50 to-slate-950'
-    }`}>
+        ? 'border-slate-200'
+        : 'border-slate-800'
+    }`}
+    style={{
+      backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url(/fotos/header.jpeg)`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }}>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 md:py-12">
         <div className="flex items-start justify-between gap-6">
           {/* Logo and Text */}
@@ -33,7 +38,7 @@ export function BrandHeader({
                   {/* Diez Logo - Más grande */}
                   <div className="relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0">
                     <Image
-                      src={theme === 'light' ? '/diezb.png' : '/diez.png'}
+                      src="/diez.png"
                       alt="Diez Producciones"
                       fill
                       className="object-contain"
@@ -49,7 +54,7 @@ export function BrandHeader({
                   {/* Salamanca Logo */}
                   <div className="relative w-16 h-16 md:w-20 md:h-20 flex-shrink-0">
                     <Image
-                      src={theme === 'light' ? '/salamancab.png' : '/salamanca.png'}
+                      src="/salamanca.png"
                       alt="Salamanca"
                       fill
                       className="object-contain"
@@ -61,14 +66,10 @@ export function BrandHeader({
               </div>
             )}
             <div>
-              <h1 className={`font-bebas text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight ${
-                theme === 'light' ? 'text-slate-900' : 'text-slate-100'
-              }`}>
+              <h1 className="font-bebas text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight text-white">
                 {event}
               </h1>
-              <p className={`mt-2 text-sm md:text-base max-w-xl font-medium ${
-                theme === 'light' ? 'text-slate-600' : 'text-slate-400'
-              }`}>
+              <p className="mt-2 text-sm md:text-base max-w-xl font-medium text-slate-200">
                 {subtitle}
               </p>
             </div>

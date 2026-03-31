@@ -6,7 +6,41 @@ import { useCart } from '@/lib/cart-context';
 import { useTheme } from '@/lib/theme-context';
 import { formatPrice } from '@/lib/utils';
 
-// Obtener emoji según categoría
+// Obtener ruta de imagen del producto
+function getProductImagePath(name: string): string | null {
+  const normalizedName = name.toLowerCase();
+  
+  const imageMap: Record<string, string> = {
+    'quilmes': '/products/quilmes-lata.png',
+    'stella': '/products/stella-lata.png',
+    'stella artois': '/products/stella-lata.png',
+    'coca': '/products/coca-lata.png',
+    'coca cola': '/products/coca-lata.png',
+    'coca-cola': '/products/coca-lata.png',
+    'agua': '/products/agua-botella.png',
+    'agua mineral': '/products/agua-botella.png',
+    'fernet': '/products/fernet-botella.png',
+    'fernet branca': '/products/fernet-botella.png',
+    'remera': '/products/remera.png',
+    'remera negra': '/products/remera.png',
+    'entrada': '/products/tickets.png',
+    'ticket': '/products/tickets.png',
+  };
+  
+  if (imageMap[normalizedName]) {
+    return imageMap[normalizedName];
+  }
+  
+  for (const [key, path] of Object.entries(imageMap)) {
+    if (normalizedName.includes(key) || key.includes(normalizedName)) {
+      return path;
+    }
+  }
+  
+  return null;
+}
+
+// Obtener emoji según categoría (fallback)
 function getCategoryEmoji(category: string): string {
   const emojis: Record<string, string> = {
     cerveza: '🍺',
@@ -42,6 +76,7 @@ export function ProductCard({ product }: { product: Product }) {
   const handleDecrement = () => setQuantity(q => (q > 1 ? q - 1 : 1));
 
   const isOutOfStock = product.stock === 0;
+  const imagePath = getProductImagePath(product.name);
   const emoji = getCategoryEmoji(product.category);
   const priceDisplay = formatPrice(product.price);
 
@@ -68,9 +103,17 @@ export function ProductCard({ product }: { product: Product }) {
       <div className={`relative aspect-square flex items-center justify-center overflow-hidden transition-colors ${
         isDark ? 'bg-slate-800/50' : 'bg-slate-100'
       }`}>
-        <span className="text-6xl group-hover:scale-110 transition-transform duration-300">
-          {emoji}
-        </span>
+        {imagePath ? (
+          <img
+            src={imagePath}
+            alt={product.name}
+            className="w-24 h-24 object-contain group-hover:scale-110 transition-transform duration-300"
+          />
+        ) : (
+          <span className="text-6xl group-hover:scale-110 transition-transform duration-300">
+            {emoji}
+          </span>
+        )}
         
         {/* Stock Badge */}
         {isOutOfStock && (

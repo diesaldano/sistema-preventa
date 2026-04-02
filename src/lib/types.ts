@@ -23,6 +23,7 @@ export type OrderItem = {
 
 export type Order = {
   code: string;
+  customerIP?: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;

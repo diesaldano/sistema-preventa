@@ -1,38 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { 
-  generateOrderCode, 
-  isValidEmail, 
-  isValidPhone,
-  isValidName,
-  sanitizeName,
-  isValidComprobante 
-} from '@/lib/utils';
+import { generateOrderCode } from '@/lib/utils';
 import { Order, OrderStatus } from '@/lib/types';
+import { 
+  validateEmail, 
+  validatePhone,
+  validateName,
+  validateItems,
+  validateComprobante,
+  calculateTotalFromItems,
+  verifyTotal
+} from '@/lib/validators';
+import { 
+  checkRateLimitByIP,
+  checkRateLimitByEmail,
+  checkDuplicateOrder,
+  logSecurityEvent
+} from '@/lib/rate-limiter';
 
 /**
- * R1.4: Extraer IP del cliente desde headers
- * Funciona en desarrollo (localhost) y producción (proxies, Vercel, etc)
+ * Extraer IP del cliente desde headers
+ * Funciona en: desarrollo (localhost), producción (Vercel/proxies), Cloudflare, etc.
  */
 function getClientIP(request: NextRequest): string {
-  // Order: x-forwarded-for (Vercel, proxies) → x-real-ip (nginx) → fallback
   const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
+  if (forwarded) return forwarded.split(',')[0].trim();
   
   const realIp = request.headers.get('x-real-ip');
-  if (realIp) {
-    return realIp;
-  }
+  if (realIp) return realIp;
   
-  // Fallback: usar cf-connecting-ip (Cloudflare) si existe
   const cf = request.headers.get('cf-connecting-ip');
-  if (cf) {
-    return cf;
-  }
+  if (cf) return cf;
   
-  // Último fallback: usar localhost/unknown
   return 'unknown';
 }
 
@@ -50,371 +49,156 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const clientIP = getClientIP(request);
+  
   try {
-    // R3.1 + R1.4: Obtener IP del cliente PRIMERO (necesário para logging)
-    const clientIP = getClientIP(request);
-
+    // ============================================================
+    // 1. PARSED REQUEST BODY
+    // ============================================================
+    
     const contentType = request.headers.get('content-type') || '';
-    let name, email, phone, items, total, comprobante, comprobanteMime;
+    let customerName: string | null = null;
+    let customerEmail: string | null = null;
+    let customerPhone: string | null = null;
+    let items: any[] = [];
+    let clientTotal: number | null = null;
+    let comprobante: string | null = null;
+    let comprobanteMime: string | null = null;
 
-    // Intentar parsear como FormData primero (si contiene multipart)
     if (contentType.includes('multipart/form-data')) {
       try {
         const formData = await request.formData();
-        name = formData.get('customerName') as string;
-        email = formData.get('customerEmail') as string;
-        phone = formData.get('customerPhone') as string;
-        
+        customerName = formData.get('customerName') as string;
+        customerEmail = formData.get('customerEmail') as string;
+        customerPhone = formData.get('customerPhone') as string;
         const itemsStr = formData.get('items') as string;
         items = itemsStr ? JSON.parse(itemsStr) : [];
-        
-        // R1.2: Frontend NO envía total, backend lo recalculará
         const totalStr = formData.get('total') as string;
-        total = totalStr ? parseInt(totalStr, 10) : null;
-
-        // Procesar archivo si existe (OPCIONAL)
+        clientTotal = totalStr ? parseInt(totalStr, 10) : null;
+        
         const file = formData.get('comprobante') as File | null;
         if (file && file.size > 0) {
           const buffer = await file.arrayBuffer();
-          // Convertir buffer a base64 de forma segura
           const bytes = new Uint8Array(buffer);
-          let binary = '';
-          for (let i = 0; i < bytes.length; i++) {
-            binary += String.fromCharCode(bytes[i]);
-          }
-          comprobante = btoa(binary);
+          comprobante = Buffer.from(bytes).toString('base64');
           comprobanteMime = file.type;
         }
-      } catch (formError) {
-        console.error('Error parsing FormData:', formError);
-        return NextResponse.json(
-          { error: 'Error al procesar el formulario' },
-          { status: 400 }
-        );
+      } catch (error) {
+        console.error('Error parsing FormData:', error);
+        return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
       }
     } else {
-      // Parsear como JSON
       try {
         const body = await request.json();
-        name = body.name || body.customerName;
-        email = body.email || body.customerEmail;
-        phone = body.phone || body.customerPhone;
+        customerName = body.customerName || body.name;
+        customerEmail = body.customerEmail || body.email;
+        customerPhone = body.customerPhone || body.phone;
         items = typeof body.items === 'string' ? JSON.parse(body.items) : body.items;
-        // R1.2: Frontend NO envía total
-        total = body.total ? 
-          (typeof body.total === 'string' ? parseInt(body.total, 10) : body.total) 
-          : null;
+        clientTotal = body.total;
         comprobante = body.comprobante;
         comprobanteMime = body.comprobanteMime;
-      } catch (jsonError) {
-        console.error('Error parsing JSON:', jsonError);
-        return NextResponse.json(
-          { error: 'Formato de solicitud inválido' },
-          { status: 400 }
-        );
+      } catch (error) {
+        console.error('Error parsing JSON:', error);
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
       }
     }
 
     // ============================================================
-    // PHASE 1 - R1.1: VALIDACIÓN ESTRICTA DE INPUTS
+    // 2. VALIDATE INPUTS - PHASE 1 SECURITY
     // ============================================================
 
-    // 1. Validar que todos los campos requeridos existan
-    if (!name || !email || !phone || !items) {
-      // R3.1: Log security event
-      await db.securityLog.create(
-        clientIP,
-        email || 'unknown',
-        'invalid_input',
-        `Faltan campos: ${!name ? 'name ' : ''}${!email ? 'email ' : ''}${!phone ? 'phone ' : ''}${!items ? 'items' : ''}`
-      );
+    // Validar email
+    const emailValidation = validateEmail(customerEmail);
+    if (!emailValidation.valid) {
+      await logSecurityEvent(clientIP, customerEmail || 'unknown', 'invalid_input', `Email: ${emailValidation.error}`);
+      return NextResponse.json({ error: emailValidation.error, field: 'email' }, { status: 400 });
+    }
+    const normalizedEmail = (customerEmail as string).toLowerCase().trim();
 
-      return NextResponse.json(
-        { error: 'Faltan campos requeridos: nombre, email, teléfono, productos' },
-        { status: 400 }
-      );
+    // Validar teléfono
+    const phoneValidation = validatePhone(customerPhone);
+    if (!phoneValidation.valid) {
+      await logSecurityEvent(clientIP, normalizedEmail, 'invalid_input', `Phone: ${phoneValidation.error}`);
+      return NextResponse.json({ error: phoneValidation.error, field: 'phone' }, { status: 400 });
     }
 
-    // 2. Validar NOMBRE (2-50 caracteres, sin números)
-    if (!isValidName(name)) {
-      // R3.1: Log security event
-      await db.securityLog.create(
-        clientIP,
-        email,
-        'invalid_input',
-        `Nombre inválido: "${name}" (longitud: ${name.length})`
-      );
-
-      return NextResponse.json(
-        { 
-          error: 'Nombre inválido. Debe tener 2-50 caracteres, sin números',
-          field: 'name'
-        },
-        { status: 400 }
-      );
+    // Validar nombre
+    const nameValidation = validateName(customerName);
+    if (!nameValidation.valid) {
+      await logSecurityEvent(clientIP, normalizedEmail, 'invalid_input', `Name: ${nameValidation.error}`);
+      return NextResponse.json({ error: nameValidation.error, field: 'name' }, { status: 400 });
     }
-    
-    // Sanitizar nombre (trim, single spaces)
-    const sanitizedName = sanitizeName(name);
+    const sanitizedName = (customerName as string).trim();
 
-    // 3. Validar EMAIL (formato estricto)
-    if (!isValidEmail(email)) {
-      // R3.1: Log security event
-      await db.securityLog.create(
-        clientIP,
-        email,
-        'invalid_input',
-        `Email inválido: "${email}"`
-      );
-
-      return NextResponse.json(
-        { 
-          error: 'Email inválido. Verifica el formato (ej: nombre@dominio.com)',
-          field: 'email'
-        },
-        { status: 400 }
-      );
+    // Validar items
+    const itemsValidation = await validateItems(items);
+    if (!itemsValidation.valid) {
+      await logSecurityEvent(clientIP, normalizedEmail, 'invalid_input', `Items: ${itemsValidation.error}`);
+      return NextResponse.json({ error: itemsValidation.error, field: 'items' }, { status: 400 });
     }
 
-    // 4. Validar TELÉFONO (Argentina, 10+ dígitos)
-    if (!isValidPhone(phone)) {
-      // R3.1: Log security event
-      await db.securityLog.create(
-        clientIP,
-        email,
-        'invalid_input',
-        `Teléfono inválido: "${phone}" (dígitos: ${(phone || '').replace(/\D/g, '').length})`
-      );
+    // Calcular total desde precios actuales de BD
+    const serverTotal = calculateTotalFromItems(itemsValidation.validatedItems!);
 
-      return NextResponse.json(
-        { 
-          error: 'Teléfono inválido. Debe tener al menos 10 dígitos',
-          field: 'phone'
-        },
-        { status: 400 }
-      );
-    }
-
-    // 5. Validar ITEMS (array no vacío)
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { 
-          error: 'El carrito está vacío. Agrega al menos un producto',
-          field: 'items'
-        },
-        { status: 400 }
-      );
-    }
-
-    // 6. Validar cada item
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      
-      if (!item.productId || item.quantity === undefined) {
-        return NextResponse.json(
-          { 
-            error: `Producto ${i + 1} inválido: falta productId o cantidad`,
-            field: 'items'
-          },
-          { status: 400 }
-        );
-      }
-      
-      const quantity = parseInt(item.quantity, 10);
-      if (!Number.isInteger(quantity) || quantity <= 0) {
-        return NextResponse.json(
-          { 
-            error: `Producto ${i + 1}: cantidad debe ser un número positivo`,
-            field: 'items'
-          },
-          { status: 400 }
-        );
+    // Verificar total del cliente vs servidor
+    if (clientTotal) {
+      const totalVerification = verifyTotal(clientTotal, serverTotal);
+      if (!totalVerification.valid) {
+        await logSecurityEvent(clientIP, normalizedEmail, 'fraud', `Total mismatch: client=${clientTotal}, server=${serverTotal}`);
+        return NextResponse.json({ error: totalVerification.error, field: 'total' }, { status: 400 });
       }
     }
 
-    // 7. Validar COMPROBANTE si existe
-    if (comprobante && comprobanteMime) {
-      const comprobanteValidation = isValidComprobante(comprobanteMime, Buffer.byteLength(comprobante));
+    // Validar comprobante si existe
+    if (comprobante || comprobanteMime) {
+      const comprobanteValidation = await validateComprobante(comprobante, comprobanteMime);
       if (!comprobanteValidation.valid) {
-        return NextResponse.json(
-          { 
-            error: comprobanteValidation.error,
-            field: 'comprobante'
-          },
-          { status: 400 }
-        );
+        await logSecurityEvent(clientIP, normalizedEmail, 'invalid_input', `Comprobante: ${comprobanteValidation.error}`);
+        return NextResponse.json({ error: comprobanteValidation.error, field: 'comprobante' }, { status: 400 });
       }
     }
 
     // ============================================================
-    // PHASE 1 - R1.3: PREVENIR DOBLE-CREACIÓN
-    // Detecta si hay orden duplicada en últimos 5 minutos
+    // 3. RATE LIMITING - PREVENT ABUSE
     // ============================================================
 
-    const recentOrder = await db.order.findRecentByEmail(email.toLowerCase().trim());
-    if (recentOrder) {
-      console.warn(`⚠️ DOBLE-CREACIÓN DETECTADA: ${email}`, {
-        email,
-        recentOrderCode: recentOrder.code,
-        recentOrderTime: recentOrder.createdAt,
-        timestamp: new Date().toISOString(),
-      });
-
-      // R3.1: Log security event
-      await db.securityLog.create(
-        clientIP,
-        email,
-        'duplicate',
-        `Intento de crear orden duplicada. Orden previa: ${recentOrder.code}`
-      );
-      
+    const rateLimitIP = await checkRateLimitByIP(clientIP);
+    if (!rateLimitIP.ok) {
+      await logSecurityEvent(clientIP, normalizedEmail, 'rate_limit_ip', `Exceeded IP limit: ${rateLimitIP.count}/${rateLimitIP.limit}`);
       return NextResponse.json(
-        {
-          error: `Ya existe una orden reciente (${recentOrder.code}). Si necesitas crear otra, espera 5 minutos.`,
-          field: 'duplicate',
-          recentOrderCode: recentOrder.code,
-          recentOrderStatus: recentOrder.status,
-        },
-        { status: 409 } // 409 Conflict
+        { error: 'Too many requests from this IP. Try again in 1 hour.', retryAfter: 3600 },
+        { status: 429 }
+      );
+    }
+
+    const rateLimitEmail = await checkRateLimitByEmail(normalizedEmail);
+    if (!rateLimitEmail.ok) {
+      await logSecurityEvent(clientIP, normalizedEmail, 'rate_limit_email', `Exceeded email limit: ${rateLimitEmail.count}/${rateLimitEmail.limit}`);
+      return NextResponse.json(
+        { error: 'Too many orders from this email. Try again in 1 hour.', retryAfter: 3600 },
+        { status: 429 }
       );
     }
 
     // ============================================================
-    // PHASE 1 - R1.4: RATE LIMITING
-    // Previene abuso de creación de órdenes por IP/email
-    // Límite: 2 órdenes por email en 1 hora
+    // 4. DEDUPLICATION - PREVENT ACCIDENTAL DOUBLE-CLICK
     // ============================================================
 
-    const recentOrdersByEmail = await db.order.countByEmailInLastHour(
-      email.toLowerCase().trim()
-    );
-
-    // LÍMITE: máximo 2 órdenes por email en 1 hora (R1.3 cubre 5 min window)
-    // Si ya tiene 1 orden en última hora, puede crear 1 más
-    // Si intenta 3ª orden → bloqueado temporalmente
-    if (recentOrdersByEmail >= 2) {
-      console.warn(`🚫 RATE LIMIT EXCEDIDO: ${email}`, {
-        email,
-        ip: clientIP,
-        ordersInLastHour: recentOrdersByEmail,
-        limit: 2,
-        timestamp: new Date().toISOString(),
-      });
-
-      // R3.1: Log security event
-      await db.securityLog.create(
-        clientIP,
-        email,
-        'rate_limit',
-        `Excedió límite de 2 órdenes/hora. Cuenta: ${recentOrdersByEmail}`
-      );
-
-      // Obtener detalles de órdenes recientes para análisis
-      const recentOrders = await db.order.getRecentOrdersByEmail(email, 1);
-
+    const dupCheck = await checkDuplicateOrder(normalizedEmail);
+    if (dupCheck.isDuplicate) {
+      await logSecurityEvent(clientIP, normalizedEmail, 'duplicate', `Duplicate order within 5min window`);
       return NextResponse.json(
-        {
-          error: 'Límite de órdenes alcanzado. Espera 1 hora antes de crear otra.',
-          field: 'rate_limit',
-          rateLimitExceeded: true,
-          retryAfterSeconds: 3600,
-          recentOrdersCount: recentOrdersByEmail,
+        { 
+          error: 'You already have a recent order. Please wait 5 minutes before creating another.',
+          existingOrderCode: dupCheck.existingOrder?.code,
+          statusCode: 409
         },
-        { status: 429 } // 429 Too Many Requests
+        { status: 409 }
       );
     }
 
     // ============================================================
-    // PHASE 1 - R1.2: RECALCULAR TOTAL DESDE BD
-    // SIN CONFIAR EN FRONTEND - PREVENIR FRAUDES
-    // ============================================================
-
-    // Calcular total REAL desde base de datos
-    const totalCalculation = await db.order.calculateTotalFromItems(
-      items.map((item: any) => ({
-        productId: item.productId,
-        quantity: parseInt(item.quantity, 10),
-        price: item.price ? parseInt(item.price, 10) : undefined,
-      }))
-    );
-
-    // 8.1 Si hay fraude detectado (precio modificado)
-    if (totalCalculation.fraudDetected) {
-      console.warn(`🚨 FRAUDE DETECTADO: ${email} intentó modificar precios`, {
-        email,
-        details: totalCalculation.details,
-        timestamp: new Date().toISOString(),
-      });
-
-      // R3.1: Log security event
-      await db.securityLog.create(
-        clientIP,
-        email,
-        'fraud',
-        `Intento de modificar precios: ${totalCalculation.details.filter((d: any) => !d.match).map((d: any) => `${d.productId}: ${d.frontendPrice} vs ${d.bdPrice}`).join('; ')}`
-      );
-      
-      return NextResponse.json(
-        {
-          error: 'Intento de fraude detectado: precios fueron modificados',
-          field: 'fraud',
-          fraudAlert: true,
-        },
-        { status: 400 }
-      );
-    }
-
-    // 8.2 Si hay problema de stock insuficiente
-    if (totalCalculation.stockIssue) {
-      console.warn(`Stock insuficiente: ${email}`, {
-        email,
-        details: totalCalculation.details,
-        timestamp: new Date().toISOString(),
-      });
-
-      // R3.1: Log security event
-      await db.securityLog.create(
-        clientIP,
-        email,
-        'stock_issue',
-        `Stock insuficiente para: ${totalCalculation.details.filter((d: any) => d.stockIssue).map((d: any) => d.productId).join(', ')}`
-      );
-      
-      return NextResponse.json(
-        {
-          error: 'Stock insuficiente para completar la orden',
-          field: 'stock',
-          details: totalCalculation.details,
-        },
-        { status: 400 }
-      );
-    }
-
-    // 8.3 Si algún producto no existe
-    if (!totalCalculation.valid && totalCalculation.details.some((d: any) => d.fraudFlag)) {
-      console.warn(`Producto inválido detectado: ${email}`, {
-        email,
-        details: totalCalculation.details,
-        timestamp: new Date().toISOString(),
-      });
-      
-      return NextResponse.json(
-        {
-          error: 'Uno o más productos no existen',
-          field: 'items',
-          details: totalCalculation.details,
-        },
-        { status: 400 }
-      );
-    }
-
-    // ✅ Si llegó aquí: orden es válida
-    // Usar el TOTAL RECALCULADO, no el del frontend
-    const validatedTotal = totalCalculation.total;
-
-    // ============================================================
-    // Si llegó aquí, todos los inputs son válidos
-    // Crear la orden con TOTAL RECALCULADO
+    // 5. CREATE ORDER - ALL VALIDATIONS PASSED
     // ============================================================
 
     const code = generateOrderCode();
@@ -424,14 +208,14 @@ export async function POST(request: NextRequest) {
     const order: Order = {
       code,
       customerName: sanitizedName,
-      customerEmail: email.toLowerCase().trim(),
-      customerPhone: phone.replace(/\D/g, ''),
-      items: items.map((item: any) => ({
+      customerEmail: normalizedEmail,
+      customerPhone: customerPhone!.replace(/\D/g, ''),
+      items: itemsValidation.validatedItems!.map(item => ({
         productId: item.productId,
-        quantity: parseInt(item.quantity, 10),
-        price: typeof item.price === 'string' ? parseInt(item.price, 10) : item.price,
+        quantity: item.quantity,
+        price: item.price,
       })),
-      total: validatedTotal, // ✅ TOTAL RECALCULADO DESDE BD
+      total: serverTotal,
       status,
       comprobante: comprobante || undefined,
       comprobanteMime: comprobanteMime || undefined,
@@ -439,12 +223,33 @@ export async function POST(request: NextRequest) {
       updatedAt: now,
     };
 
-    const createdOrder = await db.order.create(order);
+    // Add customerIP to order before saving
+    const orderWithIP = {
+      ...order,
+      customerIP: clientIP,
+    } as any;
+
+    const createdOrder = await db.order.create(orderWithIP);
+    
+    console.log(`✅ ORDER CREATED: ${code} | Email: ${normalizedEmail} | IP: ${clientIP} | Total: $${serverTotal}`);
+
     return NextResponse.json(createdOrder, { status: 201 });
+
   } catch (error) {
-    console.error('Error creating order:', error);
+    console.error('❌ Error creating order:', error);
+    
+    // Log unexpected errors
+    try {
+      await logSecurityEvent(
+        getClientIP(request),
+        'unknown',
+        'invalid_input',
+        `Unexpected error: ${error instanceof Error ? error.message : 'Unknown'}`
+      );
+    } catch {}
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Error al crear el pedido' },
+      { error: 'Failed to create order. Try again later.' },
       { status: 500 }
     );
   }

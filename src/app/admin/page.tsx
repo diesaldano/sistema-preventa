@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { useTheme } from '@/lib/theme-context';
 import { formatPrice } from '@/lib/utils';
 import { BrandHeader } from '@/components/brand-header';
-import { getPollingConfig, savePollingConfig, PollingConfig } from '@/lib/polling-config';
+import { PollingConfig, POLLING_CONFIG_LIMITS } from '@/lib/polling-config';
 
 type Order = {
   code: string;
@@ -36,35 +36,81 @@ export default function AdminPage() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const [processing, setProcessing] = useState<string | null>(null);
+  const [pollingUpdating, setPollingUpdating] = useState(false);
   
-  // R2.3: Polling config (enabled/disabled + seconds)
-  const [pollingConfig, setPollingConfig] = useState<PollingConfig>({
-    enabled: false,
-    intervalMs: 5000,
-  });
-
-  // Cargar config guardada al montar
-  useEffect(() => {
-    const saved = getPollingConfig();
-    setPollingConfig(saved);
-  }, []);
+  // R2.3: Polling config desde servidor
+  const { data: pollingConfig, mutate: mutatePolling } = useSWR<PollingConfig>(
+    '/api/polling-config',
+    fetcher,
+    {
+      revalidateOnFocus: false,
+    }
+  );
 
   /**
-   * R2.3: Toggle polling on/off
+   * R2.3: Toggle polling on/off (via API)
    */
-  const handleTogglePolling = () => {
-    const newConfig = { ...pollingConfig, enabled: !pollingConfig.enabled };
-    setPollingConfig(newConfig);
-    savePollingConfig(newConfig);
+  const handleTogglePolling = async () => {
+    if (!pollingConfig) return;
+    
+    setPollingUpdating(true);
+    try {
+      const response = await fetch('/api/polling-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: !pollingConfig.enabled,
+          intervalMs: pollingConfig.intervalMs,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al actualizar polling');
+      }
+
+      await mutatePolling();
+    } catch (err) {
+      console.error('Error toggling polling:', err);
+      alert(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setPollingUpdating(false);
+    }
   };
 
   /**
-   * R2.3: Cambiar intervalo en segundos
+   * R2.3: Cambiar intervalo en segundos (via API)
    */
-  const handleChangeInterval = (seconds: number) => {
-    const newConfig = { ...pollingConfig, intervalMs: seconds * 1000 };
-    setPollingConfig(newConfig);
-    savePollingConfig(newConfig);
+  const handleChangeInterval = async (seconds: number) => {
+    if (!pollingConfig) return;
+    
+    // Validar limites
+    const clamped = Math.max(
+      POLLING_CONFIG_LIMITS.MIN_INTERVAL_MS / 1000,
+      Math.min(seconds, POLLING_CONFIG_LIMITS.MAX_INTERVAL_MS / 1000)
+    );
+
+    setPollingUpdating(true);
+    try {
+      const response = await fetch('/api/polling-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: pollingConfig.enabled,
+          intervalMs: clamped * 1000,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al actualizar intervalo');
+      }
+
+      await mutatePolling();
+    } catch (err) {
+      console.error('Error changing interval:', err);
+      alert(err instanceof Error ? err.message : 'Error');
+    } finally {
+      setPollingUpdating(false);
+    }
   };
 
   /**
@@ -76,7 +122,7 @@ export default function AdminPage() {
     '/api/orders',
     fetcher,
     {
-      refreshInterval: pollingConfig.enabled ? pollingConfig.intervalMs : 0,
+      refreshInterval: pollingConfig?.enabled ? pollingConfig.intervalMs : 0,
       dedupingInterval: 2000,
       fallbackData: [],
     }
@@ -148,61 +194,102 @@ export default function AdminPage() {
         )}
 
         {/* POLLING CONTROL - R2.3 */}
-        <div className={`rounded-lg border p-4 mb-8 transition-colors ${
+        <div className={`rounded-lg border p-6 mb-8 transition-colors ${
           isDark
-            ? 'border-slate-700 bg-slate-900'
-            : 'border-slate-200 bg-slate-50'
+            ? 'border-blue-500/30 bg-blue-500/5'
+            : 'border-blue-300 bg-blue-100/50'
         }`}>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <label className={`text-sm font-semibold ${
-                isDark ? 'text-slate-300' : 'text-slate-700'
-              }`}>
-                Auto-refresh de órdenes:
-              </label>
-              <button
-                onClick={handleTogglePolling}
-                className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
-                  pollingConfig.enabled
-                    ? isDark
-                      ? 'bg-emerald-500/30 text-emerald-400 hover:bg-emerald-500/40'
-                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                    : isDark
-                    ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                }`}
-              >
-                {pollingConfig.enabled ? '✓ ACTIVADO' : '○ DESACTIVADO'}
-              </button>
-            </div>
+          <h3 className={`text-lg font-semibold mb-4 ${
+            isDark ? 'text-blue-400' : 'text-blue-700'
+          }`}>
+            ⚙️ Control de Polling en Tiempo Real
+          </h3>
 
-            {pollingConfig.enabled && (
-              <div className="flex items-center gap-3">
-                <label className={`text-sm ${
-                  isDark ? 'text-slate-400' : 'text-slate-600'
+          {!pollingConfig ? (
+            <div className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              Cargando configuración...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Toggle */}
+              <div className="flex items-center justify-between">
+                <label className={`text-sm font-medium ${
+                  isDark ? 'text-blue-300' : 'text-blue-700'
                 }`}>
-                  Cada:
+                  Activar auto-actualización:
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={pollingConfig.intervalMs / 1000}
-                  onChange={(e) => handleChangeInterval(Math.max(1, Math.min(60, parseInt(e.target.value) || 5)))}
-                  className={`w-16 px-2 py-1 rounded text-center text-sm font-mono ${
-                    isDark
-                      ? 'bg-slate-800 border border-slate-700 text-slate-100'
-                      : 'bg-white border border-slate-300 text-slate-900'
+                <button
+                  onClick={handleTogglePolling}
+                  disabled={pollingUpdating}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                    pollingConfig.enabled
+                      ? isDark
+                        ? 'bg-emerald-500/30 text-emerald-400 hover:bg-emerald-500/40 disabled:opacity-50'
+                        : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-50'
+                      : isDark
+                      ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:opacity-50'
+                      : 'bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-50'
                   }`}
-                />
-                <span className={`text-sm ${
-                  isDark ? 'text-slate-400' : 'text-slate-600'
-                }`}>
-                  segundos
-                </span>
+                >
+                  {pollingUpdating && <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />}
+                  {pollingConfig.enabled ? '✓ ACTIVADO' : '○ DESACTIVADO'}
+                </button>
               </div>
-            )}
-          </div>
+
+              {/* Intervalo */}
+              {pollingConfig.enabled && (
+                <div className="flex items-center justify-between pt-4 border-t border-blue-300/30">
+                  <label className={`text-sm font-medium ${
+                    isDark ? 'text-blue-300' : 'text-blue-700'
+                  }`}>
+                    Intervalo de actualización:
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={POLLING_CONFIG_LIMITS.MIN_INTERVAL_MS / 1000}
+                      max={POLLING_CONFIG_LIMITS.MAX_INTERVAL_MS / 1000}
+                      value={pollingConfig.intervalMs / 1000}
+                      onChange={(e) => handleChangeInterval(parseInt(e.target.value) || 30)}
+                      disabled={pollingUpdating}
+                      className={`w-20 px-3 py-2 rounded text-center text-sm font-mono font-semibold transition ${
+                        isDark
+                          ? 'bg-slate-800 border border-slate-700 text-slate-100 disabled:opacity-50 focus:border-blue-500'
+                          : 'bg-white border border-slate-300 text-slate-900 disabled:opacity-50 focus:border-blue-500'
+                      }`}
+                    />
+                    <span className={`text-sm font-medium ${
+                      isDark ? 'text-blue-300' : 'text-blue-700'
+                    }`}>
+                      segundos
+                    </span>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      isDark
+                        ? 'bg-blue-500/20 text-blue-300'
+                        : 'bg-blue-200 text-blue-700'
+                    }`}>
+                      {pollingConfig.intervalMs / 1000 > 30 ? '1 vez/min' : `2x/min`}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Info */}
+              <div className={`text-xs p-3 rounded mt-4 ${
+                isDark
+                  ? 'bg-slate-800/50 text-slate-400'
+                  : 'bg-slate-100 text-slate-600'
+              }`}>
+                <p className="font-medium mb-1">ℹ️ Información:</p>
+                <ul className="space-y-1 list-disc list-inside">
+                  <li>Cuando está <strong>activado</strong>: Los usuarios en /pedido/[code] verán actualizaciones automáticas</li>
+                  <li>Intervalo mínimo: 10 segundos | Máximo: 120 segundos</li>
+                  <li>Default recomendado: 30 segundos (2 actualizaciones por minuto)</li>
+                  <li>Con 500 usuarios: ~{Math.round((500 * 2) / 60)} requests/segundo</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Estadísticas */}

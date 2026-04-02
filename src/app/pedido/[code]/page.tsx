@@ -3,25 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useTheme } from '@/lib/theme-context';
+import { useOrderPolling } from '@/lib/hooks';
 import { formatPrice } from '@/lib/utils';
 import { BrandHeader } from '@/components/brand-header';
+import { Order } from '@/lib/types';
 
-type Order = {
-  code: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  total: number;
-  status: string;
-  createdAt: string;
-  items: Array<{
-    productId: number;
-    quantity: number;
-    unitPrice: number;
-  }>;
-};
-
-function OrderDisplay({ order, isDark }: { order: Order; isDark: boolean }) {
+function OrderDisplay({ order, isDark, isPolling, lastUpdate }: { order: Order; isDark: boolean; isPolling: boolean; lastUpdate: Date | null }) {
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'PENDING_PAYMENT':
@@ -58,11 +45,31 @@ function OrderDisplay({ order, isDark }: { order: Order; isDark: boolean }) {
 
   return (
     <div className={`rounded-lg border p-6 shadow-lg transition-colors ${isDark ? 'border-slate-800 bg-slate-900 shadow-slate-900/40' : 'border-slate-200 bg-slate-50 shadow-slate-300/20'}`}>
-      {/* Estado */}
+      {/* Estado + Polling Badge */}
       <div className={`mb-6 pb-6 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <div className={`inline-block px-4 py-2 rounded-lg border font-medium text-sm ${getStatusBadgeColor(order.status)}`}>
-          {getStatusText(order.status)}
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`inline-block px-4 py-2 rounded-lg border font-medium text-sm ${getStatusBadgeColor(order.status)}`}>
+            {getStatusText(order.status)}
+          </div>
+          {isPolling && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${isDark ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-blue-100 text-blue-700 border border-blue-300'}`}>
+              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+              Actualizando...
+            </div>
+          )}
         </div>
+        
+        {!isPolling && (
+          <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+            Recarga la página para ver actualizaciones
+          </div>
+        )}
+        
+        {lastUpdate && (
+          <div className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+            Última actualización: {lastUpdate.toLocaleTimeString('es-AR')}
+          </div>
+        )}
       </div>
 
       {/* Código y Detalles */}
@@ -106,7 +113,7 @@ function OrderDisplay({ order, isDark }: { order: Order; isDark: boolean }) {
               </div>
               <div className="text-right">
                 <p className={`font-medium ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>x{item.quantity}</p>
-                <p className={isDark ? 'text-xs text-amber-400' : 'text-xs text-amber-600'}>{formatPrice(item.unitPrice)}</p>
+                <p className={isDark ? 'text-xs text-amber-400' : 'text-xs text-amber-600'}>{formatPrice(item.price)}</p>
               </div>
             </div>
           ))}
@@ -154,10 +161,8 @@ function OrderDisplay({ order, isDark }: { order: Order; isDark: boolean }) {
 export default function OrderPage({ params }: { params: Promise<{ code: string }> }) {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [code, setCode] = useState<string | null>(null);
+  const [code, setCode] = useState<string | undefined>(undefined);
+  const { order, loading, error, isPolling, lastUpdate } = useOrderPolling(code);
 
   useEffect(() => {
     const resolveParams = async () => {
@@ -165,72 +170,45 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
         const { code: orderCode } = await params;
         setCode(orderCode);
       } catch (err) {
-        setError('Error al resolver parámetros');
-        setLoading(false);
+        console.error('Error resolving params:', err);
       }
     };
     resolveParams();
   }, [params]);
 
-  useEffect(() => {
-    if (!code) return;
-
-    const fetchOrder = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`/api/orders/${code}`);
-        const data = await response.json();
-
-        if (!response.ok || !data.code) {
-          setError(data.error ?? 'Pedido no encontrado');
-          setOrder(null);
-        } else {
-          setOrder(data);
-          setError(null);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error al cargar el pedido');
-        setOrder(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrder();
-  }, [code]);
-
   return (
     <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
-      <BrandHeader 
-        event={loading ? 'Cargando...' : error ? 'Error' : 'Pedido'}
-        subtitle="Preventa oficial de bebidas"
-      />
+      <BrandHeader event="Mi Pedido" subtitle="Estado de tu compra" />
 
-      <div className="mx-auto max-w-2xl px-6 py-12">
-        <div className="mb-6">
-          <Link href="/" className={`text-sm ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900'}`}>
-            ← Volver al inicio
+      <div className="mx-auto max-w-2xl px-4 sm:px-6 py-12">
+        {loading && (
+          <div className={`rounded-lg border p-8 text-center transition-colors ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <div className="w-12 h-12 border-4 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+              </div>
+              <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>Cargando pedido...</p>
+            </div>
+          </div>
+        )}
+
+        {error && !order && (
+          <div className={`rounded-lg border border-l-4 p-6 transition-colors ${isDark ? 'border-red-500/30 border-l-red-500 bg-red-500/10' : 'border-red-400/30 border-l-red-500 bg-red-100/50'}`}>
+            <p className={`font-semibold ${isDark ? 'text-red-400' : 'text-red-700'}`}>Error</p>
+            <p className={`text-sm mt-1 ${isDark ? 'text-red-300/80' : 'text-red-600/80'}`}>{error}</p>
+          </div>
+        )}
+
+        {order && <OrderDisplay order={order} isDark={isDark} isPolling={isPolling} lastUpdate={lastUpdate} />}
+
+        <div className="mt-8 text-center">
+          <Link
+            href="/"
+            className={`inline-block px-6 py-2 rounded-lg font-medium transition-all ${isDark ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-200 text-slate-900 hover:bg-slate-300'}`}
+          >
+            Volver a la tienda
           </Link>
         </div>
-
-        {loading && (
-          <div className={`rounded-lg border p-12 text-center ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-slate-50'}`}>
-            <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>Cargando tu pedido...</p>
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className={`rounded-lg border p-6 text-center ${isDark ? 'border-red-500/30 bg-red-500/10' : 'border-red-300 bg-red-50'}`}>
-            <p className={`font-medium mb-4 ${isDark ? 'text-red-300' : 'text-red-700'}`}>{error}</p>
-            <Link href="/" className={`inline-block text-sm ${isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700 hover:text-slate-900'}`}>
-              Volver al inicio
-            </Link>
-          </div>
-        )}
-
-        {!loading && !error && order && (
-          <OrderDisplay order={order} isDark={isDark} />
-        )}
       </div>
     </main>
   );

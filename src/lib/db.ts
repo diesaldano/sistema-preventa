@@ -17,7 +17,7 @@ const prismaSingleton = globalThis.prismaInstance ?? prismaClientSingleton();
 
 if (process.env.NODE_ENV !== 'production') globalThis.prismaInstance = prismaSingleton;
 
-const prisma = prismaSingleton;
+export const prisma = prismaSingleton;
 
 /**
  * Generar slug a partir del nombre
@@ -762,3 +762,4 @@ export const db = {
     },
   },
 };
+

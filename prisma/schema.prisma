@@ -24,6 +24,7 @@ model Product {
 
 model Order {
   code            String      @id @unique
+  customerIP      String      @default("unknown")
   customerName    String
   customerEmail   String
   customerPhone   String
@@ -36,6 +37,7 @@ model Order {
   items           OrderItem[]
 
   @@index([status])
+  @@index([customerIP])
   @@index([customerEmail])
   @@index([createdAt])
   @@map("orders")

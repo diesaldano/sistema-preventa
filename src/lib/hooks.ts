@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Product } from './types';
+import { Product, Order } from './types';
 import { getCachedProducts, cacheProducts, isProductsCacheValid } from './cache';
 
 /**
@@ -56,4 +56,117 @@ export function useProducts() {
   }, []);
 
   return { products, loading, error, cacheHit };
+}
+
+/**
+ * PHASE 2 - R2.3: useOrderPolling
+ * 
+ * Smart polling para /pedido/[code]
+ * - Chequea si polling está enabled en servidor
+ * - Si enabled: refetch status cada N segundos
+ * - Timeout automático después de 5 minutos
+ * - Sin botón manual (0 spam risk)
+ */
+export function useOrderPolling(orderCode: string | undefined) {
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (!orderCode) {
+      setLoading(false);
+      return;
+    }
+
+    let pollingInterval: NodeJS.Timeout | null = null;
+    let pollingTimeout: NodeJS.Timeout | null = null;
+    let isComponentMounted = true;
+
+    async function fetchOrderStatus() {
+      try {
+        const response = await fetch(`/api/orders/${orderCode}`);
+        if (!response.ok) {
+          throw new Error('Order not found');
+        }
+        const data = await response.json();
+        
+        if (isComponentMounted) {
+          setOrder(data);
+          setLastUpdate(new Date());
+          setError(null);
+        }
+      } catch (err) {
+        if (isComponentMounted) {
+          setError(err instanceof Error ? err.message : 'Error fetching order');
+        }
+      }
+    }
+
+    async function initPolling() {
+      try {
+        // Obtener config de polling desde servidor
+        const configResponse = await fetch('/api/polling-config');
+        if (!configResponse.ok) {
+          throw new Error('Failed to get polling config');
+        }
+
+        const config = await configResponse.json();
+
+        if (!isComponentMounted) return;
+
+        if (config.enabled) {
+          console.log(
+            `[Polling] ENABLED for ${orderCode} at ${config.intervalMs / 1000}s interval`
+          );
+          setIsPolling(true);
+
+          // Fetch inicial
+          await fetchOrderStatus();
+
+          // Setup polling interval
+          pollingInterval = setInterval(fetchOrderStatus, config.intervalMs);
+
+          // Setup timeout (5 minutos)
+          pollingTimeout = setTimeout(() => {
+            console.log(`[Polling] TIMEOUT for ${orderCode} after 5 minutes`);
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+              pollingInterval = null;
+            }
+            if (isComponentMounted) {
+              setIsPolling(false);
+            }
+          }, 300000); // 5 minutos
+        } else {
+          console.log(`[Polling] DISABLED for ${orderCode}`);
+          setIsPolling(false);
+          // Solo fetch una vez
+          await fetchOrderStatus();
+        }
+
+        if (isComponentMounted) {
+          setLoading(false);
+        }
+      } catch (err) {
+        if (isComponentMounted) {
+          console.error('[Polling] Error initializing:', err);
+          setError(err instanceof Error ? err.message : 'Error initializing polling');
+          setLoading(false);
+        }
+      }
+    }
+
+    initPolling();
+
+    // Cleanup
+    return () => {
+      isComponentMounted = false;
+      if (pollingInterval) clearInterval(pollingInterval);
+      if (pollingTimeout) clearTimeout(pollingTimeout);
+    };
+  }, [orderCode]);
+
+  return { order, loading, error, isPolling, lastUpdate };
 }

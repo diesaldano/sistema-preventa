@@ -107,10 +107,10 @@ export function ProductCard({ product }: { product: Product }) {
           <img
             src={imagePath}
             alt={product.name}
-            className="w-24 h-24 object-contain group-hover:scale-110 transition-transform duration-300"
+            className="w-32 h-32 md:w-40 md:h-40 object-contain group-hover:scale-110 transition-transform duration-300"
           />
         ) : (
-          <span className="text-6xl group-hover:scale-110 transition-transform duration-300">
+          <span className="text-6xl md:text-7xl group-hover:scale-110 transition-transform duration-300">
             {emoji}
           </span>
         )}

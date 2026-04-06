@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Product } from '@/lib/types';
 import { useCart } from '@/lib/cart-context';
 import { useTheme } from '@/lib/theme-context';
+import { useToastContext } from '@/lib/toast-context';
 import { formatPrice } from '@/lib/utils';
 
 // Obtener ruta de imagen del producto
@@ -54,16 +55,27 @@ function getCategoryEmoji(category: string): string {
 export function ProductCard({ product }: { product: Product }) {
   const { addItem } = useCart();
   const { theme } = useTheme();
+  const toast = useToastContext();
   const [quantity, setQuantity] = useState(1);
+  const [selectedSize, setSelectedSize] = useState<string | undefined>(
+    product.sizes && product.sizes.length > 0 ? product.sizes[0] : undefined
+  );
   const [added, setAdded] = useState(false);
 
   const handleAddToCart = () => {
+    // Validar que si el producto tiene tailles, se haya seleccionado uno
+    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+      toast.warning('Por favor selecciona un talle', '⚠️ Talle requerido');
+      return;
+    }
+
     addItem({
       productId: product.id,
       name: product.name,
       price: product.price,
       quantity,
       imageUrl: product.imageUrl,
+      size: selectedSize,  // Incluir talle seleccionado
     });
     setQuantity(1);
     
@@ -107,10 +119,10 @@ export function ProductCard({ product }: { product: Product }) {
           <img
             src={imagePath}
             alt={product.name}
-            className="w-32 h-32 md:w-40 md:h-40 object-contain group-hover:scale-110 transition-transform duration-300"
+            className="w-48 h-48 lg:w-56 lg:h-56 object-contain group-hover:scale-110 transition-transform duration-300"
           />
         ) : (
-          <span className="text-6xl md:text-7xl group-hover:scale-110 transition-transform duration-300">
+          <span className="text-7xl lg:text-8xl group-hover:scale-110 transition-transform duration-300">
             {emoji}
           </span>
         )}
@@ -170,6 +182,40 @@ export function ProductCard({ product }: { product: Product }) {
           </p>
         </div>
 
+        {/* Taille Selector - Solo para productos con tailles (ej: remeras) */}
+        {product.sizes && product.sizes.length > 0 && (
+          <div className="mb-3">
+            <label className={`block text-xs font-semibold mb-2 ${
+              isDark ? 'text-slate-300' : 'text-slate-700'
+            }`}>
+              Talle
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {product.sizes.map((size) => (
+                <button
+                  key={size}
+                  onClick={() => setSelectedSize(size)}
+                  className={`
+                    w-10 h-10 rounded-md font-bold text-sm transition-all border
+                    ${
+                      selectedSize === size
+                        ? isDark
+                          ? 'bg-blue-600 text-white border-blue-500 ring-2 ring-blue-500/30'
+                          : 'bg-blue-600 text-white border-blue-500 ring-2 ring-blue-500/30'
+                        : isDark
+                        ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
+                    }
+                  `}
+                  disabled={isOutOfStock}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Quantity Controls */}
         <div className="flex items-center justify-center gap-2 mb-3">
           <button
@@ -190,7 +236,7 @@ export function ProductCard({ product }: { product: Product }) {
           </span>
           <button
             onClick={handleIncrement}
-            disabled={isOutOfStock || quantity >= product.stock}
+            disabled={isOutOfStock} // quantity >= product.stock - COMENTADO: sin límite de stock
             className={`rounded-md border w-8 h-8 flex items-center justify-center font-semibold transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed ${
               isDark
                 ? 'border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300'
@@ -226,7 +272,7 @@ export function ProductCard({ product }: { product: Product }) {
         </button>
 
         {/* Stock Indicator */}
-        <div className={`text-center text-xs mt-2 ${
+        {/* <div className={`text-center text-xs mt-2 ${
           isDark ? 'text-slate-500' : 'text-slate-600'
         }`}>
           Stock: <span className={`font-bold ${
@@ -234,7 +280,7 @@ export function ProductCard({ product }: { product: Product }) {
               ? isDark ? 'text-red-500' : 'text-red-600'
               : isDark ? 'text-slate-400' : 'text-slate-700'
           }`}>{product.stock}</span>
-        </div>
+        </div> */}
       </div>
     </div>
   );

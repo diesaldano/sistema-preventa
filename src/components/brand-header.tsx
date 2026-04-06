@@ -2,19 +2,43 @@
 
 import Image from 'next/image';
 import { useTheme } from '@/lib/theme-context';
+import { EVENT_CONFIG } from '@/lib/constants';
 
 interface BrandHeaderProps {
-  event?: string;
-  subtitle?: string;
+  event?: string; // Override event title if needed
+  subtitle?: string; // Override subtitle if needed
   showLogo?: boolean;
+  variant?: 'default' | 'compact'; // 'compact' for special pages (pedido, checkout, etc)
+}
+
+// Función para generar fecha actual en formato español
+function getCurrentDateFormatted(): string {
+  const today = new Date();
+  const day = today.getDate();
+  const months = [
+    'Enero', 'Febrero', 'Marzo', 'Abril',
+    'Mayo', 'Junio', 'Julio', 'Agosto',
+    'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  const month = months[today.getMonth()];
+  return `${day} de ${month}`;
 }
 
 export function BrandHeader({
-  event = "Preventa DIVA ROCK",
-  subtitle = "Preventa oficial de bebidas",
+  event,
+  subtitle,
   showLogo = true,
+  variant = 'default',
 }: BrandHeaderProps) {
   const { theme, toggleTheme } = useTheme();
+  const { band, venue, year, subtitle: defaultSubtitle } = EVENT_CONFIG;
+  
+  // ✅ NUEVO: Usar fecha dinámica como subtitle por defecto
+  const currentDate = getCurrentDateFormatted();
+  const displaySubtitle = subtitle !== undefined ? subtitle : defaultSubtitle;
+  
+  // Use custom title if provided, otherwise use configured event structure
+  const hasCustomTitle = event !== undefined;
 
   return (
     <div className={`border-b transition-all duration-300 ${
@@ -27,50 +51,69 @@ export function BrandHeader({
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     }}>
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 md:py-12">
-        <div className="flex items-start justify-between gap-6">
-          {/* Logo and Text */}
-          <div className="flex-1 space-y-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8 md:py-12">
+        {/* Mobile: Vertical stack, Desktop: Horizontal flex */}
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 md:gap-6">
+          {/* Logo and Text Container */}
+          <div className="flex-1 space-y-2 sm:space-y-3 md:space-y-4">
             {showLogo && (
-              <div className="inline-flex items-center gap-4">
+              <div className="inline-flex items-center gap-2 sm:gap-3 md:gap-4">
                 {/* Logos */}
-                <div className="flex items-center gap-2">
-                  {/* Diez Logo - Más grande */}
-                  <div className="relative w-24 h-24 md:w-32 md:h-32 flex-shrink-0">
+                <div className="flex items-center gap-1 sm:gap-2">
+                  {/* Diez Logo - Responsivo */}
+                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 md:w-32 md:h-32 flex-shrink-0">
                     <Image
                       src="/diez.png"
                       alt="Diez Producciones"
                       fill
                       className="object-contain"
+                      sizes="(max-width: 640px) 64px, (max-width: 768px) 80px, 128px"
                       priority
                     />
                   </div>
                   
                   {/* Divisor */}
-                  <div className={`hidden md:block h-16 w-px ${
+                  <div className={`hidden sm:block h-12 sm:h-14 md:h-16 w-px ${
                     theme === 'light' ? 'bg-slate-300' : 'bg-slate-700'
                   }`} />
                   
-                  {/* Salamanca Logo */}
-                  <div className="relative w-16 h-16 md:w-20 md:h-20 flex-shrink-0">
+                  {/* Salamanca Logo - Visible en todos los breakpoints */}
+                  <div className="relative w-10 h-10 sm:w-12 sm:h-12 md:w-20 md:h-20 flex-shrink-0">
                     <Image
                       src="/salamanca.png"
                       alt="Salamanca"
                       fill
                       className="object-contain"
+                      sizes="(max-width: 640px) 40px, (max-width: 768px) 48px, 80px"
                       priority
                     />
                   </div>
                 </div>
-                
               </div>
             )}
+            
+            {/* Title - Responsive layout */}
             <div>
-              <h1 className="font-bebas text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight text-white">
-                {event}
-              </h1>
-              <p className="mt-2 text-sm md:text-base max-w-xl font-medium text-slate-200">
-                {subtitle}
+              {hasCustomTitle ? (
+                // Custom title for special pages (pedido, checkout, etc)
+                <h1 className="font-bebas text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight">
+                  {event}
+                </h1>
+              ) : (
+                // Default event structure - Band / Venue • Year
+                <div className="space-y-0.5 sm:space-y-1">
+                  {/* Band name - always on one line */}
+                  <h1 className="font-bebas text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight">
+                    {band}
+                  </h1>
+                  {/* Venue & Year - always on one line */}
+                  <p className="font-bebas text-sm sm:text-lg md:text-3xl lg:text-4xl font-bold tracking-wide text-slate-300 leading-snug">
+                    {venue} • {year}
+                  </p>
+                </div>
+              )}
+              <p className="mt-2 sm:mt-3 text-xs sm:text-sm md:text-base max-w-xl font-medium text-slate-200">
+                {displaySubtitle}
               </p>
             </div>
           </div>
@@ -78,7 +121,7 @@ export function BrandHeader({
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className={`mt-2 p-2.5 rounded-lg border transition-all duration-300 flex items-center justify-center ${
+            className={`p-2.5 rounded-lg border transition-all duration-300 flex items-center justify-center flex-shrink-0 ${
               theme === 'light'
                 ? 'border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-sm'
                 : 'border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-400'

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { prisma } from '@/lib/db';
 import { generateOrderCode } from '@/lib/utils';
 import { Order, OrderStatus } from '@/lib/types';
 import { 
@@ -9,7 +10,9 @@ import {
   validateItems,
   validateComprobante,
   calculateTotalFromItems,
-  verifyTotal
+  verifyTotal,
+  sanitizeName,
+  sanitizeEmail
 } from '@/lib/validators';
 import { 
   checkRateLimitByIP,
@@ -35,14 +38,60 @@ function getClientIP(request: NextRequest): string {
   return 'unknown';
 }
 
+/**
+ * Agregar headers de seguridad a la respuesta
+ * Prevenir: XSS, clickjacking, MIME sniffing
+ */
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  // Prevenir XSS
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  
+  // CORS - restringir a mismo origen
+  response.headers.set('Access-Control-Allow-Origin', 'same-origin');
+  
+  // No cachear datos sensibles
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  response.headers.set('Pragma', 'no-cache');
+  response.headers.set('Expires', '0');
+  
+  return response;
+}
+
 export async function GET(request: NextRequest) {
   try {
+    console.log('[GET /api/orders] ========================================');
+    console.log('[GET /api/orders] Starting fetch from db.order.findMany()');
+    
     const orders = await db.order.findMany();
-    return NextResponse.json(orders);
+    
+    console.log(`[GET /api/orders] ✅ SUCCESS: Found ${orders.length} orders`);
+    console.log('[GET /api/orders] Sample order:', orders[0] ? { code: orders[0].code, status: orders[0].status } : 'NONE');
+    
+    return NextResponse.json({
+      success: true,
+      count: orders.length,
+      orders: orders,
+      debug: {
+        timestamp: new Date().toISOString(),
+        source: 'db.order.findMany()',
+      }
+    });
   } catch (error) {
-    console.error('Error fetching orders:', error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    console.error('[GET /api/orders] ❌ CRITICAL ERROR:', errorMsg);
+    console.error('[GET /api/orders] Stack:', errorStack);
+    
     return NextResponse.json(
-      { error: 'Failed to fetch orders' },
+      { 
+        success: false,
+        error: 'Failed to fetch orders',
+        details: errorMsg,
+        stack: process.env.NODE_ENV === 'development' ? errorStack : undefined,
+      },
       { status: 500 }
     );
   }
@@ -62,8 +111,8 @@ export async function POST(request: NextRequest) {
     let customerPhone: string | null = null;
     let items: any[] = [];
     let clientTotal: number | null = null;
-    let comprobante: string | null = null;
-    let comprobanteMime: string | null = null;
+    // ❌ REMOVED: Comprobante NO se acepta en POST /api/orders
+    // El comprobante DEBE ser subido después via POST /api/orders/[code]/upload-comprobante
 
     if (contentType.includes('multipart/form-data')) {
       try {
@@ -75,14 +124,7 @@ export async function POST(request: NextRequest) {
         items = itemsStr ? JSON.parse(itemsStr) : [];
         const totalStr = formData.get('total') as string;
         clientTotal = totalStr ? parseInt(totalStr, 10) : null;
-        
-        const file = formData.get('comprobante') as File | null;
-        if (file && file.size > 0) {
-          const buffer = await file.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          comprobante = Buffer.from(bytes).toString('base64');
-          comprobanteMime = file.type;
-        }
+        // ❌ REMOVED: Comprobante no se parsea aquí
       } catch (error) {
         console.error('Error parsing FormData:', error);
         return NextResponse.json({ error: 'Invalid form data' }, { status: 400 });
@@ -95,8 +137,7 @@ export async function POST(request: NextRequest) {
         customerPhone = body.customerPhone || body.phone;
         items = typeof body.items === 'string' ? JSON.parse(body.items) : body.items;
         clientTotal = body.total;
-        comprobante = body.comprobante;
-        comprobanteMime = body.comprobanteMime;
+        // ❌ REMOVED: Comprobante no se parsea aquí
       } catch (error) {
         console.error('Error parsing JSON:', error);
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
@@ -113,7 +154,7 @@ export async function POST(request: NextRequest) {
       await logSecurityEvent(clientIP, customerEmail || 'unknown', 'invalid_input', `Email: ${emailValidation.error}`);
       return NextResponse.json({ error: emailValidation.error, field: 'email' }, { status: 400 });
     }
-    const normalizedEmail = (customerEmail as string).toLowerCase().trim();
+    const normalizedEmail = sanitizeEmail(customerEmail as string);
 
     // Validar teléfono
     const phoneValidation = validatePhone(customerPhone);
@@ -128,7 +169,7 @@ export async function POST(request: NextRequest) {
       await logSecurityEvent(clientIP, normalizedEmail, 'invalid_input', `Name: ${nameValidation.error}`);
       return NextResponse.json({ error: nameValidation.error, field: 'name' }, { status: 400 });
     }
-    const sanitizedName = (customerName as string).trim();
+    const sanitizedName = sanitizeName(customerName as string);
 
     // Validar items
     const itemsValidation = await validateItems(items);
@@ -139,24 +180,6 @@ export async function POST(request: NextRequest) {
 
     // Calcular total desde precios actuales de BD
     const serverTotal = calculateTotalFromItems(itemsValidation.validatedItems!);
-
-    // Verificar total del cliente vs servidor
-    if (clientTotal) {
-      const totalVerification = verifyTotal(clientTotal, serverTotal);
-      if (!totalVerification.valid) {
-        await logSecurityEvent(clientIP, normalizedEmail, 'fraud', `Total mismatch: client=${clientTotal}, server=${serverTotal}`);
-        return NextResponse.json({ error: totalVerification.error, field: 'total' }, { status: 400 });
-      }
-    }
-
-    // Validar comprobante si existe
-    if (comprobante || comprobanteMime) {
-      const comprobanteValidation = await validateComprobante(comprobante, comprobanteMime);
-      if (!comprobanteValidation.valid) {
-        await logSecurityEvent(clientIP, normalizedEmail, 'invalid_input', `Comprobante: ${comprobanteValidation.error}`);
-        return NextResponse.json({ error: comprobanteValidation.error, field: 'comprobante' }, { status: 400 });
-      }
-    }
 
     // ============================================================
     // 3. RATE LIMITING - PREVENT ABUSE
@@ -198,46 +221,83 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================================
-    // 5. CREATE ORDER - ALL VALIDATIONS PASSED
+    // 5. CREATE ORDER - ATOMIC TRANSACTION
     // ============================================================
 
     const code = generateOrderCode();
     const now = new Date();
-    const status: OrderStatus = comprobante ? 'PAYMENT_REVIEW' : 'PENDING_PAYMENT';
+    // 🔄 CHANGED: Siempre PENDING_PAYMENT - Comprobante se sube después
+    const status: OrderStatus = 'PENDING_PAYMENT';
     
-    const order: Order = {
+    // ✅ ESTRUCTURA CORRECTA PARA PRISMA: items como create anidado
+    const orderData = {
       code,
       customerName: sanitizedName,
       customerEmail: normalizedEmail,
       customerPhone: customerPhone!.replace(/\D/g, ''),
-      items: itemsValidation.validatedItems!.map(item => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        price: item.price,
-      })),
+      items: {
+        create: itemsValidation.validatedItems!.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price,
+          size: item.size,  // Talle seleccionado (ej: "M", "L", "XL")
+        }))
+      },
       total: serverTotal,
       status,
-      comprobante: comprobante || undefined,
-      comprobanteMime: comprobanteMime || undefined,
+      customerIP: clientIP,
+      // ❌ Comprobante NO se guarda en creación
       createdAt: now,
       updatedAt: now,
     };
 
-    // Add customerIP to order before saving
-    const orderWithIP = {
-      ...order,
-      customerIP: clientIP,
-    } as any;
+    // ✅ PASO 4: TRANSACCIÓN ATÓMICA
+    // Usa Prisma.$transaction() para garantizar que:
+    // 1. La orden se crea efectivamente (atomicidad)
+    // 2. Si hay error, NADA se guarda (rollback automático)
+    // 3. Previene race conditions entre check y create
+    const createdOrder = await prisma.$transaction(async (tx) => {
+      // Segunda validación dentro de transacción (por si acaso)
+      // para asegurar que no hay orden duplicada justo en este momento
+      const recentOrder = await tx.order.findFirst({
+        where: {
+          customerEmail: normalizedEmail,
+          createdAt: {
+            gte: new Date(now.getTime() - 5 * 60 * 1000), // último 5 minutos
+          },
+        },
+      });
 
-    const createdOrder = await db.order.create(orderWithIP);
+      if (recentOrder) {
+        throw new Error('DUPLICATE_ORDER_IN_TRANSACTION');
+      }
+
+      return tx.order.create({ data: orderData });
+    });
     
-    console.log(`✅ ORDER CREATED: ${code} | Email: ${normalizedEmail} | IP: ${clientIP} | Total: $${serverTotal}`);
+    console.log(`✅ ORDER CREATED (ATOMIC): ${code} | Email: ${normalizedEmail} | IP: ${clientIP} | Total: $${serverTotal}`);
 
-    return NextResponse.json(createdOrder, { status: 201 });
+    const response = NextResponse.json(createdOrder, { status: 201 });
+    return addSecurityHeaders(response);
 
   } catch (error) {
     console.error('❌ Error creating order:', error);
     
+    // ✅ PASO 4: Manejo de error de duplicado en transacción
+    if (error instanceof Error && error.message === 'DUPLICATE_ORDER_IN_TRANSACTION') {
+      await logSecurityEvent(
+        clientIP,
+        'unknown',
+        'duplicate_atomic',
+        'Duplicate detected within atomic transaction'
+      );
+      const response = NextResponse.json(
+        { error: 'Duplicate order detected during processing. Please try again.' },
+        { status: 409 }
+      );
+      return addSecurityHeaders(response);
+    }
+
     // Log unexpected errors
     try {
       await logSecurityEvent(
@@ -248,9 +308,10 @@ export async function POST(request: NextRequest) {
       );
     } catch {}
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: 'Failed to create order. Try again later.' },
       { status: 500 }
     );
+    return addSecurityHeaders(response);
   }
 }

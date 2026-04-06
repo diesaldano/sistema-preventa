@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 
 // Tipos para TypeScript
 type OrderStatus = 'PENDING_PAYMENT' | 'PAYMENT_REVIEW' | 'PAID' | 'REDEEMED' | 'CANCELLED';
@@ -21,7 +22,50 @@ async function main() {
   await prisma.orderItem.deleteMany({});
   await prisma.order.deleteMany({});
   await prisma.product.deleteMany({});
+  await prisma.user.deleteMany({});
   console.log('✓ Base de datos limpia\n');
+
+  // Crear usuarios de prueba (Admin y Staff)
+  console.log('👥 Creando usuarios de prueba...');
+  const adminPassword = await bcrypt.hash('admin123', 10);
+  const staffPassword = await bcrypt.hash('staff123', 10);
+
+  const users = await Promise.all([
+    prisma.user.create({
+      data: {
+        id: 'admin-001',
+        email: 'admin@preventa.local',
+        password_hash: adminPassword,
+        role: 'ADMIN',
+        active: true,
+      },
+    }),
+    prisma.user.create({
+      data: {
+        id: 'staff-001',
+        email: 'staff1@preventa.local',
+        password_hash: staffPassword,
+        role: 'STAFF',
+        active: true,
+      },
+    }),
+    prisma.user.create({
+      data: {
+        id: 'staff-002',
+        email: 'staff2@preventa.local',
+        password_hash: staffPassword,
+        role: 'STAFF',
+        active: true,
+      },
+    }),
+  ]);
+
+  console.log(`✓ ${users.length} usuarios de prueba creados`);
+  users.forEach((u) => {
+    console.log(`  • ${u.email} (${u.role})`);
+  });
+  console.log('  Contraseña admin: admin123');
+  console.log('  Contraseña staff: staff123\n');
 
   // Crear 10 productos realistas
   console.log('🍺 Creando productos...');
@@ -34,6 +78,7 @@ async function main() {
         price: 3000,  // $3.000
         category: 'bebidas',
         stock: 300,
+        available: true,
       },
     }),
     prisma.product.create({
@@ -44,6 +89,7 @@ async function main() {
         price: 6000,  // $6.000
         category: 'bebidas',
         stock: 250,
+        available: true,
       },
     }),
     prisma.product.create({
@@ -54,6 +100,7 @@ async function main() {
         price: 6000,  // $6.000
         category: 'cerveza',
         stock: 200,
+        available: true,
       },
     }),
     prisma.product.create({
@@ -64,16 +111,19 @@ async function main() {
         price: 7000,  // $7.000
         category: 'cerveza',
         stock: 180,
+        available: true,
       },
     }),
     prisma.product.create({
       data: {
         id: 'remera-diez',
-        name: 'Remera DIEZ',
-        description: 'Remera oficial DIEZ Producciones',
+        name: 'Remera',
+        description: 'Remera Autos Robados',
         price: 15000,  // $15.000
         category: 'merch',
         stock: 100,
+        available: true,
+        sizes: ['S', 'M', 'L', 'XL'],  // Tailles disponibles
       },
     }),
     prisma.product.create({
@@ -84,6 +134,8 @@ async function main() {
         price: 15000,  // $15.000
         category: 'merch',
         stock: 100,
+        available: false,
+        sizes: ['S', 'M', 'L', 'XL'],  // Tailles disponibles
       },
     }),
     prisma.product.create({
@@ -94,6 +146,7 @@ async function main() {
         price: 35000,  // $35.000
         category: 'entrada',
         stock: 500,
+        available: true,
       },
     }),
     prisma.product.create({
@@ -104,6 +157,7 @@ async function main() {
         price: 40000,  // $40.000
         category: 'combo',
         stock: 80,
+        available: true,
       },
     }),
     prisma.product.create({
@@ -114,6 +168,7 @@ async function main() {
         price: 8000,  // $8.000
         category: 'bebidas',
         stock: 120,
+        available: true,
       },
     }),
     prisma.product.create({
@@ -124,6 +179,7 @@ async function main() {
         price: 24000,  // $24.000
         category: 'cerveza',
         stock: 150,
+        available: true,
       },
     }),
   ]);
@@ -380,6 +436,7 @@ async function main() {
   });
 
   console.log('\n✅ Seed completado correctamente!');
+  console.log(`  • ${users.length} usuarios (admin y staff)`);
   console.log(`  • ${products.length} productos`);
   console.log(`  • ${orders.length} órdenes de prueba`);
 }

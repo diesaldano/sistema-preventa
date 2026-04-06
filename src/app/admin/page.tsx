@@ -1,11 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { useTheme } from '@/lib/theme-context';
+import { useAuth } from '@/lib/auth-context';
 import { formatPrice } from '@/lib/utils';
 import { BrandHeader } from '@/components/brand-header';
+import { UserHeader } from '@/components/user-header';
+import { useToastContext } from '@/lib/toast-context';
 import { PollingConfig, POLLING_CONFIG_LIMITS } from '@/lib/polling-config';
 
 type Order = {
@@ -34,11 +38,16 @@ const fetcher = (url: string) =>
 
 export default function AdminPage() {
   const { theme } = useTheme();
+  const { user, logout, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const toast = useToastContext();
   const isDark = theme === 'dark';
   const [processing, setProcessing] = useState<string | null>(null);
   const [pollingUpdating, setPollingUpdating] = useState(false);
-  
-  // R2.3: Polling config desde servidor
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [confirmRejectCode, setConfirmRejectCode] = useState<string | null>(null);
+
+  // R2.3: Polling config desde servidor - MUST be called unconditionally
   const { data: pollingConfig, mutate: mutatePolling } = useSWR<PollingConfig>(
     '/api/polling-config',
     fetcher,
@@ -46,6 +55,58 @@ export default function AdminPage() {
       revalidateOnFocus: false,
     }
   );
+
+  // R2.3: useSWR con polling configurable - MUST be called unconditionally
+  const { data, error, isLoading, mutate } = useSWR<Order[]>(
+    '/api/orders',
+    fetcher,
+    {
+      refreshInterval: pollingConfig?.enabled ? pollingConfig.intervalMs : 0,
+      dedupingInterval: 2000,
+      fallbackData: [],
+    }
+  );
+
+  // Redirigir a login si no está autenticado
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
+
+  // Si está cargando la autenticación, mostrar pantalla de carga
+  if (authLoading) {
+    return (
+      <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
+        <BrandHeader 
+          event="Panel de Administración"
+          subtitle="DIEZ PRODUCCIONES - Validación de Pedidos"
+        />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className={`text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            <div className="inline-block mb-4 w-12 h-12 border-4 border-current border-t-transparent rounded-full animate-spin"></div>
+            <p>Verificando autenticación...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Si no está autenticado, no mostrar nada (se redirigirá)
+  if (!user) {
+    return null;
+  }
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      router.push('/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+      setIsLoggingOut(false);
+    }
+  }
 
   /**
    * R2.3: Toggle polling on/off (via API)
@@ -71,7 +132,7 @@ export default function AdminPage() {
       await mutatePolling();
     } catch (err) {
       console.error('Error toggling polling:', err);
-      alert(err instanceof Error ? err.message : 'Error');
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar polling');
     } finally {
       setPollingUpdating(false);
     }
@@ -107,7 +168,7 @@ export default function AdminPage() {
       await mutatePolling();
     } catch (err) {
       console.error('Error changing interval:', err);
-      alert(err instanceof Error ? err.message : 'Error');
+      toast.error(err instanceof Error ? err.message : 'Error al actualizar intervalo');
     } finally {
       setPollingUpdating(false);
     }
@@ -117,18 +178,11 @@ export default function AdminPage() {
    * PHASE 2 - R2.3: useSWR con polling configurable
    * - refreshInterval: 0 si disabled, intervalMs si enabled
    * - Sin bloqueos, simple config
+   * 
+   * API returns: { success, count, orders: [...], debug: {...} }
+   * Extract the orders array from the response
    */
-  const { data, error, isLoading, mutate } = useSWR<Order[]>(
-    '/api/orders',
-    fetcher,
-    {
-      refreshInterval: pollingConfig?.enabled ? pollingConfig.intervalMs : 0,
-      dedupingInterval: 2000,
-      fallbackData: [],
-    }
-  );
-
-  const orders = data || [];
+  const orders = (data as any)?.orders || [];
   const loading = isLoading && orders.length === 0;
   const hasError = error !== undefined;
 
@@ -145,16 +199,25 @@ export default function AdminPage() {
 
       // R2.3: Usar mutate() para refetch automático
       mutate();
+      toast.success('Pedido validado exitosamente', '✓ Éxito');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error');
+      toast.error(err instanceof Error ? err.message : 'Error al validar');
     } finally {
       setProcessing(null);
     }
   }
 
   async function handleReject(code: string) {
-    if (!confirm('¿Rechazar este pedido?')) return;
+    // Requiere confirmación con doble-click para evitar errors accidentales
+    if (confirmRejectCode !== code) {
+      setConfirmRejectCode(code);
+      toast.info('Haz click nuevamente para confirmar rechazo');
+      // Auto-limpiar la confirmación después de 3 segundos
+      setTimeout(() => setConfirmRejectCode(null), 3000);
+      return;
+    }
 
+    setConfirmRejectCode(null);
     setProcessing(code);
     try {
       const response = await fetch(`/api/orders/${code}/reject`, {
@@ -167,8 +230,9 @@ export default function AdminPage() {
 
       // R2.3: Usar mutate() para refetch automático
       mutate();
+      toast.success('Pedido rechazado', '⚠️ Rechazado');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Error');
+      toast.error(err instanceof Error ? err.message : 'Error al rechazar');
     } finally {
       setProcessing(null);
     }
@@ -178,6 +242,9 @@ export default function AdminPage() {
   const confirmadoOrders = orders.filter((o: Order) => o.status === 'PAID');
   const deliveredOrders = orders.filter((o: Order) => o.status === 'REDEEMED');
   const cancelledOrders = orders.filter((o: Order) => o.status === 'CANCELLED');
+  
+  // 🔔 Órdenes con comprobante que requieren revisión inmediata
+  const paymentReviewOrders = orders.filter((o: Order) => o.status === 'PAYMENT_REVIEW');
 
   return (
     <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
@@ -186,11 +253,41 @@ export default function AdminPage() {
         subtitle="DIEZ PRODUCCIONES - Sistema de Validación"
       />
 
+      {/* User Info Bar - Componente Genérico */}
+      <UserHeader 
+        email={user.email} 
+        role={user.role} 
+        isLoggingOut={isLoggingOut}
+        onLogout={handleLogout}
+      />
+
       <div className="mx-auto max-w-6xl px-6 py-12">
         {hasError && (
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300 mb-6">
             Error al cargar los pedidos
           </div>
+        )}
+
+        {/* Quick Access - Órdenes con comprobante para revisar (URGENTE) */}
+        {paymentReviewOrders.length > 0 && (
+          <a href="#payment-review-section" className={`block mb-8 px-6 py-4 rounded-lg font-bold text-lg transition-all transform hover:scale-105 active:scale-95 shadow-lg ${
+            isDark
+              ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white hover:shadow-amber-600/50'
+              : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-amber-500/50'
+          }`}>
+            📸 {paymentReviewOrders.length} COMPROBANTE{paymentReviewOrders.length !== 1 ? 'S' : ''} POR REVISAR → IR AHORA
+          </a>
+        )}
+        
+        {/* Quick Access - Pedidos sin validar */}
+        {pendingOrders.filter((o: Order) => o.status === 'PENDING_PAYMENT').length > 0 && (
+          <a href="#pending-section" className={`block mb-8 px-6 py-4 rounded-lg font-bold text-lg transition-all transform hover:scale-105 active:scale-95 shadow-lg ${
+            isDark
+              ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white hover:shadow-orange-600/50'
+              : 'bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-orange-500/50'
+          }`}>
+            🚨 {pendingOrders.filter((o: Order) => o.status === 'PENDING_PAYMENT').length} PEDIDO{pendingOrders.filter((o: Order) => o.status === 'PENDING_PAYMENT').length !== 1 ? 'S' : ''} PENDIENTE → IR AHORA
+          </a>
         )}
 
         {/* POLLING CONTROL - R2.3 */}
@@ -202,7 +299,7 @@ export default function AdminPage() {
           <h3 className={`text-lg font-semibold mb-4 ${
             isDark ? 'text-blue-400' : 'text-blue-700'
           }`}>
-            ⚙️ Control de Polling en Tiempo Real
+            🔄 Control de Actualización de Pedidos
           </h3>
 
           {!pollingConfig ? (
@@ -232,7 +329,7 @@ export default function AdminPage() {
                   }`}
                 >
                   {pollingUpdating && <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />}
-                  {pollingConfig.enabled ? '✓ ACTIVADO' : '○ DESACTIVADO'}
+                  {pollingConfig.enabled ? '✓ ENCENDIDO' : '○ APAGADO'}
                 </button>
               </div>
 
@@ -308,6 +405,18 @@ export default function AdminPage() {
           </div>
           <div className={`rounded-lg border p-4 transition-colors ${
             isDark
+              ? 'border-amber-500/30 bg-amber-500/10'
+              : 'border-amber-300 bg-amber-100/50'
+          }`}>
+            <p className={`text-sm font-medium ${
+              isDark ? 'text-amber-400' : 'text-amber-700'
+            }`}>🔍 Por Revisar</p>
+            <p className={`text-3xl font-bold ${
+              isDark ? 'text-amber-300' : 'text-amber-600'
+            }`}>{paymentReviewOrders.length}</p>
+          </div>
+          <div className={`rounded-lg border p-4 transition-colors ${
+            isDark
               ? 'border-yellow-500/30 bg-yellow-500/10'
               : 'border-yellow-300 bg-yellow-100/50'
           }`}>
@@ -316,7 +425,7 @@ export default function AdminPage() {
             }`}>Pendientes</p>
             <p className={`text-3xl font-bold ${
               isDark ? 'text-yellow-300' : 'text-yellow-600'
-            }`}>{pendingOrders.length}</p>
+            }`}>{pendingOrders.filter((o: Order) => o.status === 'PENDING_PAYMENT').length}</p>
           </div>
           <div className={`rounded-lg border p-4 transition-colors ${
             isDark
@@ -342,43 +451,117 @@ export default function AdminPage() {
               isDark ? 'text-blue-300' : 'text-blue-600'
             }`}>{deliveredOrders.length}</p>
           </div>
-          <div className={`rounded-lg border p-4 transition-colors ${
-            isDark
-              ? 'border-red-500/30 bg-red-500/10'
-              : 'border-red-300 bg-red-100/50'
-          }`}>
-            <p className={`text-sm font-medium ${
-              isDark ? 'text-red-400' : 'text-red-700'
-            }`}>Cancelados</p>
-            <p className={`text-3xl font-bold ${
-              isDark ? 'text-red-300' : 'text-red-600'
-            }`}>{cancelledOrders.length}</p>
-          </div>
         </div>
 
-        {/* Pendientes de Validación */}
-        <div className="mb-8">
-          <h2 className={`text-xl font-semibold mb-4 ${
-            isDark ? 'text-slate-100' : 'text-slate-900'
+        {/* Comprobantes por Revisar - SECCIÓN IMPORTANTE */}
+        <div className="mb-8" id="payment-review-section">
+          <h2 className={`text-xl font-semibold mb-4 flex items-center gap-2 ${
+            isDark ? 'text-amber-400' : 'text-amber-700'
           }`}>
-            Pendientes de Validación ({pendingOrders.length})
+            <span className="text-2xl">📸</span>
+            Comprobantes por Revisar ({paymentReviewOrders.length})
           </h2>
 
           {loading ? (
             <div className={`text-center py-8 ${
               isDark ? 'text-slate-400' : 'text-slate-600'
             }`}>Cargando...</div>
-          ) : pendingOrders.length === 0 ? (
+          ) : paymentReviewOrders.length === 0 ? (
             <div className={`rounded-lg border p-6 text-center transition-colors ${
               isDark
                 ? 'border-slate-800 bg-slate-900/50 text-slate-400'
                 : 'border-slate-200 bg-slate-100/50 text-slate-600'
             }`}>
-              No hay pedidos pendientes
+              ✅ No hay comprobantes pendientes de revisar
             </div>
           ) : (
             <div className="space-y-3">
-              {pendingOrders.map((order: Order) => (
+              {paymentReviewOrders.map((order: Order) => (
+                <div
+                  key={order.code}
+                  className={`rounded-lg border p-4 transition-colors ${
+                    isDark
+                      ? 'border-amber-500/50 bg-amber-500/10'
+                      : 'border-amber-300 bg-amber-100/50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className={`font-semibold font-mono ${
+                          isDark ? 'text-amber-400' : 'text-amber-700'
+                        }`}>{order.code}</p>
+                        <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                          isDark
+                            ? 'bg-amber-500/30 text-amber-300'
+                            : 'bg-amber-200 text-amber-800'
+                        }`}>
+                          COMPROBANTE SUBIDO
+                        </span>
+                      </div>
+                      <p className={`text-sm font-medium ${
+                        isDark ? 'text-slate-200' : 'text-slate-800'
+                      }`}>{order.customerName}</p>
+                      <p className={`text-sm ${
+                        isDark ? 'text-slate-400' : 'text-slate-600'
+                      }`}>{order.customerEmail}</p>
+                    </div>
+                    <p className={`font-mono font-bold text-lg ${
+                      isDark ? 'text-amber-400' : 'text-amber-700'
+                    }`}>
+                      {formatPrice(order.total)}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleValidate(order.code)}
+                      disabled={processing === order.code}
+                      className="flex-1 rounded px-3 py-2 text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 text-white transition disabled:opacity-50"
+                    >
+                      ✓ Confirmar Pago
+                    </button>
+                    <button
+                      onClick={() => handleReject(order.code)}
+                      disabled={processing === order.code}
+                      className={`flex-1 rounded px-3 py-2 text-sm font-semibold transition ${
+                        confirmRejectCode === order.code
+                          ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                          : 'bg-red-500 hover:bg-red-600 text-white'
+                      } disabled:opacity-50`}
+                    >
+                      {confirmRejectCode === order.code ? '⚠️ ¿Confirmar Rechazo?' : '✕ Rechazar'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pendientes de Validación */}
+        <div className="mb-8" id="pending-section">
+          <h2 className={`text-xl font-semibold mb-4 ${
+            isDark ? 'text-slate-100' : 'text-slate-900'
+          }`}>
+            Pendientes sin Comprobante ({pendingOrders.filter((o: Order) => o.status === 'PENDING_PAYMENT').length})
+          </h2>
+
+          {loading ? (
+            <div className={`text-center py-8 ${
+              isDark ? 'text-slate-400' : 'text-slate-600'
+            }`}>Cargando...</div>
+          ) : pendingOrders.filter((o: Order) => o.status === 'PENDING_PAYMENT').length === 0 ? (
+            <div className={`rounded-lg border p-6 text-center transition-colors ${
+              isDark
+                ? 'border-slate-800 bg-slate-900/50 text-slate-400'
+                : 'border-slate-200 bg-slate-100/50 text-slate-600'
+            }`}>
+              No hay pedidos pendientes sin comprobante
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {pendingOrders.filter((o: Order) => o.status === 'PENDING_PAYMENT').map((order: Order) => (
                 <div
                   key={order.code}
                   className={`rounded-lg border p-4 transition-colors ${
@@ -417,9 +600,13 @@ export default function AdminPage() {
                     <button
                       onClick={() => handleReject(order.code)}
                       disabled={processing === order.code}
-                      className="flex-1 rounded px-3 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white transition disabled:opacity-50"
+                      className={`flex-1 rounded px-3 py-2 text-sm font-semibold transition ${
+                        confirmRejectCode === order.code
+                          ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                          : 'bg-red-600 hover:bg-red-700 text-white'
+                      } disabled:opacity-50`}
                     >
-                      Rechazar
+                      {confirmRejectCode === order.code ? '⚠️ ¿Confirmar Rechazo?' : 'Rechazar'}
                     </button>
                   </div>
                 </div>

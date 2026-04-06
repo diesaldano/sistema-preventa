@@ -23,6 +23,26 @@
 # misc
 .DS_Store
 *.pem
+notes.txt
+
+# TEST FILES - KEEP LOCAL (sensible/internal)
+*.ps1
+test-*.js
+check-*.js
+
+# INTERNAL DOCUMENTATION - KEEP LOCAL
+ARCHIVOS_CLAVE.md
+CAMBIOS_ARCHIVOS_CLAVE.md
+GUIA_USO.md
+IMPLEMENTATION_SUMMARY.md
+STAFF_AUTH_IMPLEMENTATION.md
+STAFF_AUTH_SETUP.md
+VERIFICATION_CHECKLIST.md
+DEBUG_GUIDE.md
+
+# LOGS
+*.log
+build.log
 
 # debug
 npm-debug.log*
@@ -32,7 +52,6 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
-!.env.example
 
 # vercel
 .vercel

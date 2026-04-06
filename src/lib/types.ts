@@ -13,12 +13,14 @@ export type Product = {
   category: string;
   imageUrl: string;
   stock: number;
+  sizes?: string[];  // Tailles disponibles para remeras: ["M", "L", "XL"]
 };
 
 export type OrderItem = {
   productId: string;
   quantity: number;
   price: number;
+  size?: string;  // Talle seleccionado (ej: "M", "L", "XL") - solo para remeras
 };
 
 export type Order = {

@@ -13,8 +13,89 @@
 import { prisma } from '@/lib/db';
 
 /**
+ * SANITIZACIÓN DE INPUTS - Prevenir XSS
+ * 
+ * Escapa caracteres peligrosos de HTML
+ * Nota: Prisma previene SQL injection, esto es para XSS/display
+ */
+function sanitizeHTML(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
+
+/**
+ * Sanitizar nombre: trim + validar caracteres + escalar HTML
+ */
+export function sanitizeName(name: string): string {
+  const trimmed = name.trim();
+  // Ya validado en validateName, pero escalar para seguridad
+  return sanitizeHTML(trimmed).slice(0, 50);
+}
+
+/**
+ * Sanitizar email: lowercase + trim + validar
+ */
+export function sanitizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+/**
+ * Validar que ProductId sea válido (UUID format o slug simple)
+ * Prevenir path traversal y otros ataques
+ */
+export function validateProductId(productId: unknown): { valid: boolean; error?: string } {
+  if (typeof productId !== 'string' || productId.length === 0) {
+    return { valid: false, error: 'Product ID must be non-empty string' };
+  }
+
+  // Permitir solo: letras, números, guiones, guiones bajos
+  // Denegar: slashes, puntos, caracteres especiales
+  if (!/^[a-zA-Z0-9_-]{1,50}$/.test(productId)) {
+    return { valid: false, error: 'Invalid Product ID format' };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validar que Size sea válido si se proporciona
+ */
+export function validateSize(size: unknown, availableSizes?: string[]): { valid: boolean; error?: string } {
+  // Si no se proporciona size, está OK (es opcional)
+  if (size === null || size === undefined || size === '') {
+    return { valid: true };
+  }
+
+  if (typeof size !== 'string') {
+    return { valid: false, error: 'Size must be string' };
+  }
+
+  const trimmedSize = size.trim();
+
+  // Si se proporcionan tailles disponibles, validar contra ellos
+  if (availableSizes && availableSizes.length > 0) {
+    if (!availableSizes.includes(trimmedSize)) {
+      return { valid: false, error: `Invalid size. Available: ${availableSizes.join(', ')}` };
+    }
+  } else {
+    // Validación genérica: solo letras y números, máx 10 chars
+    if (!/^[a-zA-Z0-9]{1,10}$/.test(trimmedSize)) {
+      return { valid: false, error: 'Invalid size format' };
+    }
+  }
+
+  return { valid: true };
+}
+
+/**
  * Validar email
  * RFC 5322 básico (no exhaustivo, solo lo razonable)
+ * Prevenir: email spoofing, injection, explotación
  */
 export function validateEmail(email: unknown): { valid: boolean; error?: string } {
   if (typeof email !== 'string') {
@@ -28,14 +109,15 @@ export function validateEmail(email: unknown): { valid: boolean; error?: string 
     return { valid: false, error: 'Email length must be 5-254 characters' };
   }
 
-  // Regex básico RFC 5322 simplificado
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // Regex: más restrictivo para prevenir ReDoS y ataques
+  // Formato: "usuario@dominio.extension"
+  const emailRegex = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i;
   if (!emailRegex.test(trimmed)) {
     return { valid: false, error: 'Invalid email format' };
   }
 
-  // Verificar que no tenga caracteres peligrosos
-  if (/[<>"%';()&+]/.test(trimmed)) {
+  // Denegar caracteres peligrosos
+  if (/[<>"%;()&+\n\r\t]/.test(trimmed)) {
     return { valid: false, error: 'Email contains forbidden characters' };
   }
 
@@ -44,14 +126,20 @@ export function validateEmail(email: unknown): { valid: boolean; error?: string 
 
 /**
  * Validar teléfono
- * Argentina: 10+ dígitos (ej: 1123456789 o +5491123456789)
+ * Argentina: 10-15 dígitos (E.164 format)
+ * Prevenir: inyección, control chars
  */
 export function validatePhone(phone: unknown): { valid: boolean; error?: string } {
   if (typeof phone !== 'string') {
     return { valid: false, error: 'Phone must be string' };
   }
 
-  const digits = phone.replace(/\D/g, '');
+  // Denegar caracteres de control
+  if (/[\n\r\t\x00-\x1f]/.test(phone)) {
+    return { valid: false, error: 'Phone contains forbidden characters' };
+  }
+
+  const digits = phone.replace(/[\D]/g, '');
 
   // Mínimo 10 dígitos (Argentina)
   if (digits.length < 10) {
@@ -68,7 +156,8 @@ export function validatePhone(phone: unknown): { valid: boolean; error?: string 
 
 /**
  * Validar nombre
- * 2-50 caracteres, solo letras, espacios, guiones (para apelativos)
+ * 2-50 caracteres, solo letras, espacios, guiones, apóstrofes
+ * Prevenir: XSS, inyección HTML
  */
 export function validateName(name: unknown): { valid: boolean; error?: string } {
   if (typeof name !== 'string') {
@@ -82,8 +171,15 @@ export function validateName(name: unknown): { valid: boolean; error?: string } 
     return { valid: false, error: 'Name must be 2-50 characters' };
   }
 
-  // Solo letras, espacios, guiones, apóstrofes
-  if (!/^[a-záéíóúàèìòùäëïöüâêîôûñçA-ZÁÉÍÓÚÀÈÌÒÙÄËÏÖÜÂÊÎÔÛÑÇ\s\-']+$/.test(trimmed)) {
+  // Denegar caracteres de control
+  if (/[\n\r\t\x00-\x1f]/.test(trimmed)) {
+    return { valid: false, error: 'Name contains forbidden characters' };
+  }
+
+  // Solo letras (incluyendo acentos), espacios, guiones, apóstrofes
+  // Regex: previene ReDoS y es más seguro
+  const nameRegex = /^[\p{L}\s\-']+$/u;
+  if (!nameRegex.test(trimmed)) {
     return { valid: false, error: 'Name can only contain letters, spaces, hyphens, and apostrophes' };
   }
 
@@ -115,6 +211,12 @@ export async function validateProductAndStock(
   productId: string,
   requestedQuantity: number
 ): Promise<{ valid: boolean; error?: string; price?: number }> {
+  // Validar formato de productId primero
+  const productIdCheck = validateProductId(productId);
+  if (!productIdCheck.valid) {
+    return { valid: false, error: productIdCheck.error };
+  }
+
   if (typeof productId !== 'string' || productId.length === 0) {
     return { valid: false, error: 'Product ID is required' };
   }
@@ -125,7 +227,11 @@ export async function validateProductAndStock(
     });
 
     if (!product) {
-      return { valid: false, error: `Product not found: ${productId}` };
+      return { valid: false, error: `Product not found` };
+    }
+
+    if (!product.available) {
+      return { valid: false, error: `Product is unavailable` };
     }
 
     if (product.stock < requestedQuantity) {
@@ -150,7 +256,7 @@ export async function validateProductAndStock(
 export async function validateItems(items: unknown): Promise<{
   valid: boolean;
   error?: string;
-  validatedItems?: Array<{ productId: string; quantity: number; price: number }>;
+  validatedItems?: Array<{ productId: string; quantity: number; price: number; size?: string }>;
 }> {
   if (!Array.isArray(items) || items.length === 0) {
     return { valid: false, error: 'Items must be non-empty array' };
@@ -160,32 +266,64 @@ export async function validateItems(items: unknown): Promise<{
     return { valid: false, error: 'Too many items (max 50)' };
   }
 
-  const validatedItems: Array<{ productId: string; quantity: number; price: number }> = [];
+  const validatedItems: Array<{ productId: string; quantity: number; price: number; size?: string }> = [];
 
   for (const item of items) {
     if (typeof item !== 'object' || !item) {
       return { valid: false, error: 'Each item must be object' };
     }
 
-    const { productId, quantity } = item;
+    const { productId, quantity, size } = item;
+
+    // Validar formato de productId
+    const productIdCheck = validateProductId(productId);
+    if (!productIdCheck.valid) {
+      return { valid: false, error: `Item: ${productIdCheck.error}` };
+    }
 
     // Validar cantidad
     const qtyCheck = validateQuantity(quantity);
     if (!qtyCheck.valid) {
-      return { valid: false, error: qtyCheck.error };
+      return { valid: false, error: `Item: ${qtyCheck.error}` };
     }
 
-    // Validar producto y stock
-    const productCheck = await validateProductAndStock(productId, quantity);
-    if (!productCheck.valid) {
-      return { valid: false, error: productCheck.error };
-    }
+    // Validar producto y stock (también obtiene sizes disponibles)
+    try {
+      const product = await prisma.product.findUnique({
+        where: { id: productId }
+      });
 
-    validatedItems.push({
-      productId,
-      quantity,
-      price: productCheck.price!
-    });
+      if (!product) {
+        return { valid: false, error: `Product not found: ${productId}` };
+      }
+
+      if (!product.available) {
+        return { valid: false, error: `Product unavailable: ${product.name}` };
+      }
+
+      if (product.stock < quantity) {
+        return {
+          valid: false,
+          error: `Insufficient stock for ${product.name}. Available: ${product.stock}, Requested: ${quantity}`
+        };
+      }
+
+      // Validar size contra sizes disponibles del producto
+      const sizeCheck = validateSize(size, product.sizes);
+      if (!sizeCheck.valid) {
+        return { valid: false, error: `Item ${product.name}: ${sizeCheck.error}` };
+      }
+
+      validatedItems.push({
+        productId,
+        quantity,
+        price: product.price,
+        size: size,  // Talle seleccionado (ej: "M", "L", "XL") - opcional
+      });
+    } catch (error) {
+      console.error('Error validating item:', error);
+      return { valid: false, error: 'Error validating item' };
+    }
   }
 
   return { valid: true, validatedItems };
@@ -196,7 +334,7 @@ export async function validateItems(items: unknown): Promise<{
  * NUNCA confiar en el total del frontend
  */
 export function calculateTotalFromItems(
-  validatedItems: Array<{ productId: string; quantity: number; price: number }>
+  validatedItems: Array<{ productId: string; quantity: number; price: number; size?: string }>
 ): number {
   return validatedItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
 }

@@ -51,19 +51,37 @@ function SuccessContent() {
           </div>
         )}
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row justify-center">
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center rounded-xl bg-brand px-6 py-3 text-sm font-medium text-white transition hover:bg-brand-dark"
-          >
-            Volver al Inicio
-          </Link>
+        {/* ⚠️ ALERTA URGENTE: Comprobante obligatorio */}
+        <div className={`mt-8 rounded-xl border-2 p-6 transition-all ${
+          isDark
+            ? 'border-red-500/80 bg-red-600/30 shadow-lg shadow-red-600/20'
+            : 'border-red-500 bg-red-100/50 shadow-lg shadow-red-400/30'
+        }`}>
+          <p className={`font-bold text-lg mb-2 ${isDark ? 'text-red-100' : 'text-red-900'}`}>
+            ⚠️ IMPORTANTE: Tu Comprobante es Obligatorio
+          </p>
+          <p className={`text-sm mb-4 ${isDark ? 'text-red-200/90' : 'text-red-800/90'}`}>
+            En el siguiente paso, debes subir tu comprobante de pago. Sin esto, nuestro equipo NO podrá validar tu pago.
+          </p>
+          <p className={`text-xs ${isDark ? 'text-red-300/70' : 'text-red-700/70'}`}>
+            Tendrás el código de tu transferencia + pantalla del comprobante
+          </p>
+        </div>
+
+        {/* ÚNICO botón: Ver mi Pedido (prominente) */}
+
+        {/* ÚNICO botón: Ver mi Pedido (prominente) */}
+        <div className="mt-8">
           {code && (
             <Link
               href={`/pedido/${code}`}
-              className={`inline-flex items-center justify-center rounded-xl border px-6 py-3 text-sm font-medium transition ${isDark ? 'border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800' : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-50'}`}
+              className={`block w-full py-4 px-6 text-lg font-bold rounded-xl transition-all transform hover:scale-105 active:scale-95 shadow-lg ${
+                isDark
+                  ? 'bg-gradient-to-r from-emerald-600 to-green-600 text-white hover:shadow-emerald-600/50'
+                  : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:shadow-emerald-500/50'
+              }`}
             >
-              Ver mi Pedido
+              ✅ Ir a mi Pedido (Subir Comprobante)
             </Link>
           )}
         </div>

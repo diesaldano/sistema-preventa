@@ -12,9 +12,10 @@ import { cacheOrLoad, getCacheStats, invalidateCache } from '@/lib/server-cache'
 export async function GET(request: NextRequest) {
   try {
     // Usar cache con fallback a BD
+    // Solo retornar productos disponibles (stock > 0 y available: true)
     const products = await cacheOrLoad(
       'products:all',
-      () => db.product.findMany(),
+      () => db.product.findAvailable(),
       3600000 // 1 hora
     );
 

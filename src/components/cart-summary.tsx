@@ -6,7 +6,7 @@ import { useTheme } from '@/lib/theme-context';
 import { formatPrice } from '@/lib/utils';
 
 export function CartSummary() {
-  const { items, total, clearCart } = useCart();
+  const { items, total, clearCart, removeItem } = useCart();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -51,10 +51,11 @@ export function CartSummary() {
       <div className="space-y-2 mb-5 max-h-60 overflow-y-auto scrollbar-hide">
         {items.map((item) => {
           const itemTotalPrice = item.price * item.quantity;
+          const itemKey = `${item.productId}-${item.size || 'no-size'}`;
 
           return (
             <div
-              key={item.productId}
+              key={itemKey}
               className={`flex items-start justify-between text-xs p-3 rounded-md border transition-colors ${
                 isDark
                   ? 'bg-slate-800/30 border-slate-800/50 hover:bg-slate-800/50'
@@ -65,19 +66,42 @@ export function CartSummary() {
                 <p className={`font-semibold truncate text-sm ${
                   isDark ? 'text-slate-100' : 'text-slate-900'
                 }`}>{item.name}</p>
-                <p className={`mt-0.5 ${
+                <div className={`mt-0.5 flex items-center gap-2 ${
                   isDark ? 'text-slate-500' : 'text-slate-600'
                 }`}>
-                  {item.quantity}x {formatPrice(item.price)}
-                </p>
+                  <span>{item.quantity}x {formatPrice(item.price)}</span>
+                  {/* Mostrar talle si existe */}
+                  {item.size && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      isDark
+                        ? 'bg-blue-900/40 text-blue-300'
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      Talle: {item.size}
+                    </span>
+                  )}
+                </div>
               </div>
-              <p className={`font-bold ml-2 flex-shrink-0 text-sm ${
-                  isDark
-                    ? 'text-amber-500 font-medium'
-                    : 'text-amber-700 font-medium'
-              }`}>
-                {formatPrice(itemTotalPrice)}
-              </p>
+              <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                <p className={`font-bold text-sm ${
+                    isDark
+                      ? 'text-amber-500 font-medium'
+                      : 'text-amber-700 font-medium'
+                }`}>
+                  {formatPrice(itemTotalPrice)}
+                </p>
+                <button
+                  onClick={() => removeItem(item.productId, item.size)}
+                  className={`p-1 rounded transition-colors hover:bg-red-500/30 ${
+                    isDark
+                      ? 'text-slate-400 hover:text-red-400'
+                      : 'text-slate-600 hover:text-red-600'
+                  }`}
+                  title="Eliminar del carrito"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           );
         })}
@@ -111,7 +135,7 @@ export function CartSummary() {
             : 'bg-slate-900 hover:bg-slate-800 text-white hover:shadow-slate-900/30'
         }`}
       >
-        Checkout →
+        Ir a Pagar →
       </Link>
 
       {/* Clear Cart Button */}

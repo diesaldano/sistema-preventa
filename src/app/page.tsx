@@ -31,10 +31,7 @@ export default function Home() {
       isDark ? 'bg-slate-950' : 'bg-white'
     }`}>
       {/* Brand Header */}
-      <BrandHeader 
-        event="AUTOS ROBADOS DIVA ROCK 2026"
-        subtitle="Preventa oficial de bebidas"
-      />
+      <BrandHeader />
 
       {/* Filter Bar - Sticky */}
       <div className={`border-b sticky top-0 z-40 transition-colors ${

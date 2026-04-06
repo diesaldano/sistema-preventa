@@ -8,13 +8,14 @@ export type CartItem = {
   price: number;
   quantity: number;
   imageUrl?: string;
+  size?: string;  // Talle seleccionado (ej: "M", "L", "XL") - solo para remeras
 };
 
 type CartContextType = {
   items: CartItem[];
   addItem: (item: CartItem) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  removeItem: (productId: string, size?: string) => void;
+  updateQuantity: (productId: string, quantity: number, size?: string) => void;
   clearCart: () => void;
   total: number;
 };
@@ -47,29 +48,40 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addItem = (newItem: CartItem) => {
     setItems((prevItems) => {
-      const existingItem = prevItems.find((item) => item.productId === newItem.productId);
+      // Buscar item existente: MISMO productId Y MISMO talle
+      const existingItem = prevItems.find(
+        (item) => item.productId === newItem.productId && item.size === newItem.size
+      );
       if (existingItem) {
+        // Si existe, sumar cantidad
         return prevItems.map((item) =>
-          item.productId === newItem.productId
+          item.productId === newItem.productId && item.size === newItem.size
             ? { ...item, quantity: item.quantity + newItem.quantity }
             : item
         );
       }
+      // Si no existe, agregar como item nuevo (permite múltiples tallas del mismo producto)
       return [...prevItems, newItem];
     });
   };
 
-  const removeItem = (productId: string) => {
-    setItems((prevItems) => prevItems.filter((item) => item.productId !== productId));
+  const removeItem = (productId: string, size?: string) => {
+    setItems((prevItems) =>
+      prevItems.filter(
+        (item) => !(item.productId === productId && item.size === size)
+      )
+    );
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
+  const updateQuantity = (productId: string, quantity: number, size?: string) => {
     if (quantity <= 0) {
-      removeItem(productId);
+      removeItem(productId, size);
     } else {
       setItems((prevItems) =>
         prevItems.map((item) =>
-          item.productId === productId ? { ...item, quantity } : item
+          item.productId === productId && item.size === size
+            ? { ...item, quantity }
+            : item
         )
       );
     }

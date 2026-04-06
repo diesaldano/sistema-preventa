@@ -88,7 +88,7 @@ export async function checkDuplicateOrder(email: string) {
 export async function logSecurityEvent(
   clientIP: string,
   email: string,
-  reason: 'rate_limit_ip' | 'rate_limit_email' | 'duplicate' | 'invalid_input' | 'fraud' | 'stock_issue',
+  reason: 'rate_limit_ip' | 'rate_limit_email' | 'duplicate' | 'duplicate_atomic' | 'invalid_input' | 'fraud' | 'stock_issue' | 'rate_limit_login' | 'login_attempt_failed' | 'login_success',
   details?: string
 ) {
   try {

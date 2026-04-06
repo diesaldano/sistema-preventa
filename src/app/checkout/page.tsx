@@ -25,6 +25,8 @@ const STEPS = [
   { id: 4, label: 'Confirmación' },
 ];
 
+const CHECKOUT_STORAGE_KEY = 'checkout_data';
+
 // Componente para carrito vacío
 function EmptyCartView({ isDark }: { isDark: boolean }) {
   return (
@@ -80,6 +82,32 @@ export default function CheckoutPage() {
 
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // ============================================================
+  // 💾 PERSISTENCIA localStorage - Guardar/Cargar Datos
+  // ============================================================
+
+  // Cargar datos del localStorage al montar
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(CHECKOUT_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setFormData(parsed);
+      }
+    } catch (err) {
+      console.warn('Error loading checkout data from localStorage:', err);
+    }
+  }, []);
+
+  // Guardar datos en localStorage cada vez que cambian
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify(formData));
+    } catch (err) {
+      console.warn('Error saving checkout data to localStorage:', err);
+    }
+  }, [formData]);
 
   // ============================================================
   // Validación Frontend Consistente con Backend (R1.1)
@@ -140,6 +168,12 @@ export default function CheckoutPage() {
         clearInterval(interval);
         setError('El tiempo para transferir ha expirado. Por favor, intenta nuevamente.');
         setCurrentStep(1);
+        // 🧹 Limpiar localStorage si expira el tiempo
+        try {
+          localStorage.removeItem(CHECKOUT_STORAGE_KEY);
+        } catch (err) {
+          console.warn('Error clearing checkout data:', err);
+        }
         setFormData({ name: '', email: '', phone: '' });
         setStep2StartTime(null);
         clearCart();
@@ -221,6 +255,7 @@ export default function CheckoutPage() {
             productId: item.productId,
             quantity: item.quantity,
             price: item.price,
+            size: item.size,  // Incluir talle seleccionado
           }))
         )
       );
@@ -268,6 +303,12 @@ export default function CheckoutPage() {
 
   const handleViewOrder = () => {
     if (orderCode) {
+      // 🧹 Limpiar localStorage después de crear orden exitosamente
+      try {
+        localStorage.removeItem(CHECKOUT_STORAGE_KEY);
+      } catch (err) {
+        console.warn('Error clearing checkout data:', err);
+      }
       clearCart();
       router.push(`/pedido/${orderCode}`);
     }
@@ -308,6 +349,20 @@ export default function CheckoutPage() {
                     isDark ? 'bg-slate-700' : 'bg-blue-600'
                   }`} />
                 </div>
+
+                {/* Info: Email para comprobante */}
+                <div className={`mb-6 p-4 rounded-lg border-l-4 ${
+                  isDark
+                    ? 'bg-slate-800/50 border-amber-600'
+                    : 'bg-amber-50 border-amber-500'
+                }`}>
+                  <p className={`text-sm font-medium ${
+                    isDark ? 'text-amber-200' : 'text-amber-900'
+                  }`}>
+                    📧 El email que declare será utilizado para enviarle el comprobante de su pedido.
+                  </p>
+                </div>
+
                 <form className="space-y-5">
                   <div>
                     <label className={`block text-sm font-medium mb-2 ${
@@ -487,6 +542,49 @@ export default function CheckoutPage() {
                       <AlertCircle size={16} className="flex-shrink-0" />
                       <p>
                         <strong>IMPORTANTE:</strong> Transferir el monto EXACTO para validar tu pago automáticamente
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Screenshot reminder alert */}
+                <div className={`rounded-lg border-2 p-5 space-y-3 ${
+                  isDark
+                    ? 'border-green-500/60 bg-green-500/15'
+                    : 'border-green-500 bg-green-50'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`flex-shrink-0 rounded-full p-2 ${
+                      isDark ? 'bg-green-500/30' : 'bg-green-100'
+                    }`}>
+                      <svg className={`w-5 h-5 ${
+                        isDark ? 'text-green-400' : 'text-green-700'
+                      }`} fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.658 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1m.758 4.899a4 4 0 01-5.656 0m5.656-5.656a4 4 0 010 5.656m-5.656 0a4 4 0 000-5.656" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className={`font-bold text-sm mb-1 ${
+                        isDark ? 'text-green-400' : 'text-green-900'
+                      }`}>
+                        ⚠️ IMPORTANTE: Captura de Pantalla Obligatoria
+                      </h3>
+                      <p className={`text-sm mb-2 ${
+                        isDark ? 'text-green-300' : 'text-green-800'
+                      }`}>
+                        Después de realizar la transferencia, <strong>debes capturar una pantalla</strong> que muestre:
+                      </p>
+                      <ul className={`text-sm space-y-1 ml-4 list-disc ${
+                        isDark ? 'text-green-300' : 'text-green-800'
+                      }`}>
+                        <li>La confirmación de la transferencia realizada</li>
+                        <li>El monto transferido</li>
+                        <li>La fecha y hora de la transacción</li>
+                      </ul>
+                      <p className={`text-sm mt-2 font-medium ${
+                        isDark ? 'text-green-400' : 'text-green-900'
+                      }`}>
+                        ✓ En el próximo paso cargarás esta captura
                       </p>
                     </div>
                   </div>

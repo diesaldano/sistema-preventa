@@ -1,10 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTheme } from '@/lib/theme-context';
+import { useAuth } from '@/lib/auth-context';
+import { useToastContext } from '@/lib/toast-context';
 import { formatPrice } from '@/lib/utils';
 import { BrandHeader } from '@/components/brand-header';
+import { UserHeader } from '@/components/user-header';
 
 type Order = {
   code: string;
@@ -22,12 +26,57 @@ type Order = {
 
 export default function DespachoPage() {
   const { theme } = useTheme();
+  const { user, logout, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const toast = useToastContext();
   const isDark = theme === 'dark';
   const [code, setCode] = useState('');
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [delivering, setDelivering] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Redirigir a login si no está autenticado
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/despacho/login');
+    }
+  }, [user, authLoading, router]);
+
+  // Si está cargando la autenticación, mostrar pantalla de carga
+  if (authLoading) {
+    return (
+      <main className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950' : 'bg-white'}`}>
+        <BrandHeader 
+          event="Sistema de Despacho"
+          subtitle="DIEZ PRODUCCIONES - Entrega de Pedidos"
+        />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className={`text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            <div className="inline-block mb-4 w-12 h-12 border-4 border-current border-t-transparent rounded-full animate-spin"></div>
+            <p>Verificando autenticación...</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Si no está autenticado, no mostrar nada (se redirigirá)
+  if (!user) {
+    return null;
+  }
+
+  async function handleLogout() {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      router.push('/despacho/login');
+    } catch (err) {
+      console.error('Logout failed:', err);
+      setIsLoggingOut(false);
+    }
+  }
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -70,7 +119,7 @@ export default function DespachoPage() {
       }
 
       setOrder(data);
-      alert('¡Pedido marcado como entregado!');
+      toast.success('Pedido marcado como entregado exitosamente', '✓ Éxito');
       setCode('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al procesar');
@@ -84,6 +133,14 @@ export default function DespachoPage() {
       <BrandHeader 
         event="Sistema de Despacho"
         subtitle="DIEZ PRODUCCIONES - Entrega de Pedidos"
+      />
+
+      {/* User Info Bar - Componente Genérico */}
+      <UserHeader 
+        email={user.email} 
+        role={user.role} 
+        isLoggingOut={isLoggingOut}
+        onLogout={handleLogout}
       />
 
       <div className="mx-auto max-w-2xl px-6 py-12">

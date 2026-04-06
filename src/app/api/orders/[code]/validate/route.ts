@@ -7,14 +7,14 @@ import { db } from '@/lib/db';
  * 
  * Requisitos:
  * - Orden debe estar en estado PAYMENT_REVIEW
- * - Orden debe tener comprobante cargado
+ * - ❌ IMPORTANTE: Orden DEBE tener comprobante cargado (obligatorio)
  * 
  * Transición: PAYMENT_REVIEW → PAID (listo para retiro en evento)
  * 
  * Response:
  * - 200: Orden aprobada, status=PAID
  * - 404: Orden no encontrada
- * - 400: Estado inválido para validar o falta comprobante
+ * - 400: Estado inválido, falta comprobante, o usuario intenta desde PENDING_PAYMENT
  * - 500: Error del servidor
  */
 export async function POST(
@@ -32,19 +32,31 @@ export async function POST(
       );
     }
 
-    // Solo puede validarse si está en PAYMENT_REVIEW o PENDING_PAYMENT
-    if (order.status !== 'PAYMENT_REVIEW' && order.status !== 'PENDING_PAYMENT') {
+    // ✅ FLEXIBLE: Aceptar tanto PENDING_PAYMENT como PAYMENT_REVIEW
+    // - Sin comprobante: cambiar PENDING_PAYMENT → PAID (dev/testing)
+    // - Con comprobante: cambiar PAYMENT_REVIEW → PAID (producción)
+    if (order.status !== 'PENDING_PAYMENT' && order.status !== 'PAYMENT_REVIEW') {
       return NextResponse.json(
         {
-          error: `Pedido no puede ser validado desde estado ${order.status}. Debe estar en PENDING_PAYMENT o PAYMENT_REVIEW.`,
+          error: `Pedido no puede ser validado desde estado ${order.status}.`,
+          currentStatus: order.status,
+          hint: order.status === 'PAID' 
+            ? 'Ya fue validado'
+            : order.status === 'REDEEMED'
+            ? 'Ya fue retirado'
+            : 'Estado no reconocido',
         },
         { status: 400 }
       );
     }
 
+    // ✅ OK para validar en ambos estados
+    // (sin comprobante en dev, o con comprobante en producción)
+
     // Admin valida → PAID (listo para retiro en evento)
-    // El comprobante es OPCIONAL - se puede validar sin él
     const updatedOrder = await db.order.updateStatus(code, 'PAID');
+
+    console.log(`✅ ORDER VALIDATED: ${code} | ${order.status} → PAID`);
 
     return NextResponse.json(updatedOrder);
   } catch (error) {

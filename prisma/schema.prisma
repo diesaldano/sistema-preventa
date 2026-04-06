@@ -14,11 +14,14 @@ model Product {
   price       Int
   category    String
   stock       Int
+  available   Boolean     @default(true)  // Habilitar/deshabilitar producto
+  sizes       String[]    @default([])    // Tailles disponibles para remeras: ["M", "L", "XL"]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   items       OrderItem[]
 
   @@index([category])
+  @@index([available])
   @@map("products")
 }
 
@@ -40,6 +43,8 @@ model Order {
   @@index([customerIP])
   @@index([customerEmail])
   @@index([createdAt])
+  // ✅ PASO 4: Índice compuesto para optimizar deduplicación
+  @@index([customerEmail, createdAt])
   @@map("orders")
 }
 
@@ -49,6 +54,7 @@ model OrderItem {
   productId String
   quantity  Int
   price     Int
+  size      String?  // Talle seleccionado (ej: "M", "L", "XL") - solo para remeras
   createdAt DateTime @default(now())
   order     Order    @relation(fields: [orderId], references: [code], onDelete: Cascade)
   product   Product  @relation(fields: [productId], references: [id])
@@ -83,4 +89,53 @@ model SecurityLog {
   @@index([reason])
   @@index([createdAt])
   @@map("security_logs")
+}
+
+/**
+ * PHASE 4.1: User table para Admin + Staff
+ * Almacena credenciales y roles para acceso al sistema
+ */
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password_hash String
+  role      UserRole @default(STAFF)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  createdBy String?  // ID del usuario que lo creó (admin que agregó este staff)
+
+  @@index([email])
+  @@index([role])
+  @@index([active])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+/**
+ * PHASE 4.1: Blacklist para JWT invalidation
+ * Tokens revocados (logout, password change, etc)
+ * Se usa para verificar si un token fue invalidado
+ */
+model BlacklistedToken {
+  id        String   @id @default(cuid())
+  token_hash String  @unique  // SHA256 hash del JWT (nunca almacenar en claro)
+  user_id   String   // Quién era dueño del token
+  token_type TokenType
+  expires_at DateTime
+  reason    String   @default("logout") // logout, password_change, security_incident
+  created_at DateTime @default(now())
+
+  @@index([token_hash])
+  @@index([expires_at])
+  @@index([user_id])
+  @@map("blacklisted_tokens")
+}
+
+enum TokenType {
+  ACCESS
+  REFRESH
 }

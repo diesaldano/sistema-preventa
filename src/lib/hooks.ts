@@ -87,9 +87,20 @@ export function useOrderPolling(orderCode: string | undefined) {
     async function fetchOrderStatus() {
       try {
         const response = await fetch(`/api/orders/${orderCode}`);
+        
+        // Si no es OK, parsear el error correctamente
         if (!response.ok) {
-          throw new Error('Order not found');
+          let errorMessage = 'Error fetching order';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || `HTTP ${response.status}`;
+          } catch {
+            errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
+        
+        // Verificar que sea JSON válido
         const data = await response.json();
         
         if (isComponentMounted) {
@@ -99,7 +110,9 @@ export function useOrderPolling(orderCode: string | undefined) {
         }
       } catch (err) {
         if (isComponentMounted) {
-          setError(err instanceof Error ? err.message : 'Error fetching order');
+          const errorMsg = err instanceof Error ? err.message : 'Error fetching order';
+          console.error(`[Polling] Error fetching order ${orderCode}:`, errorMsg);
+          setError(errorMsg);
         }
       }
     }

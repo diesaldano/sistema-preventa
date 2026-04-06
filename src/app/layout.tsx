@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { CartProvider } from "@/lib/cart-context";
 import { ThemeProvider } from "@/lib/theme-context";
+import { AuthProvider } from "@/lib/auth-context";
+import { ToastProvider } from "@/lib/toast-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,9 +37,13 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <ThemeProvider>
-          <CartProvider>{children}</CartProvider>
-        </ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <ThemeProvider>
+              <CartProvider>{children}</CartProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </ToastProvider>
       </body>
     </html>
   );

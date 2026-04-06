@@ -32,65 +32,64 @@ function generateSlug(name: string): string {
 }
 
 /**
+ * Mapear producto con todos los campos incluyendo sizes
+ */
+function mapProduct(p: any) {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: p.price,
+    category: p.category,
+    imageUrl: '',
+    stock: p.stock,
+    sizes: p.sizes || [],  // Array de tailles disponibles
+  };
+}
+
+/**
+ * Mapear item de orden incluyendo size (talle)
+ */
+function mapOrderItem(item: any) {
+  return {
+    productId: item.productId,
+    quantity: item.quantity,
+    price: item.price,
+    size: item.size, // Talle seleccionado (ej: "M", "L", "XL")
+  };
+}
+
+/**
  * 🎯 Interfaz de BD para Productos
  */
 export const db = {
   product: {
     findMany: async () => {
       const products = await prisma.product.findMany();
-      return products.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        category: p.category,
-        imageUrl: '',
-        stock: p.stock,
-      }));
+      return products.map(mapProduct);
     },
 
     findUnique: async (id: string) => {
       const product = await prisma.product.findUnique({ where: { id } });
       if (!product) return null;
-      return {
-        id: product.id,
-        name: product.name,
-        description: product.description,
-        price: product.price,
-        category: product.category,
-        imageUrl: '',
-        stock: product.stock,
-      };
+      return mapProduct(product);
     },
 
     findByCategory: async (category: string) => {
       const products = await prisma.product.findMany({
         where: { category },
       });
-      return products.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        category: p.category,
-        imageUrl: '',
-        stock: p.stock,
-      }));
+      return products.map(mapProduct);
     },
 
     findAvailable: async () => {
       const products = await prisma.product.findMany({
-        where: { stock: { gt: 0 } },
+        where: { 
+          stock: { gt: 0 },
+          available: true,
+        },
       });
-      return products.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        category: p.category,
-        imageUrl: '',
-        stock: p.stock,
-      }));
+      return products.map(mapProduct);
     },
 
     /**
@@ -102,15 +101,7 @@ export const db = {
       const products = await prisma.product.findMany({
         where: { id: { in: ids } },
       });
-      return products.map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        category: p.category,
-        imageUrl: '',
-        stock: p.stock,
-      }));
+      return products.map(mapProduct);
     },
 
     create: async (data: Product) => {
@@ -193,19 +184,18 @@ export const db = {
     findMany: async () => {
       const orders = await prisma.order.findMany({
         include: { items: true },
+        orderBy: { createdAt: 'desc' },
       });
       return orders.map((o: any) => ({
         code: o.code,
         customerName: o.customerName,
         customerEmail: o.customerEmail,
         customerPhone: o.customerPhone,
-        items: o.items.map((item: any) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.price,
-        })),
+        items: o.items.map(mapOrderItem),
         total: o.total,
         status: o.status as OrderStatus,
+        comprobante: o.comprobante,
+        comprobanteMime: o.comprobanteMime,
         createdAt: o.createdAt,
         updatedAt: o.updatedAt,
       }));
@@ -222,11 +212,7 @@ export const db = {
         customerName: order.customerName,
         customerEmail: order.customerEmail,
         customerPhone: order.customerPhone,
-        items: order.items.map((item: any) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.price,
-        })),
+        items: order.items.map(mapOrderItem),
         total: order.total,
         status: order.status as OrderStatus,
         comprobante: order.comprobante,
@@ -246,11 +232,7 @@ export const db = {
         customerName: o.customerName,
         customerEmail: o.customerEmail,
         customerPhone: o.customerPhone,
-        items: o.items.map((item: any) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.price,
-        })),
+        items: o.items.map(mapOrderItem),
         total: o.total,
         status: o.status as OrderStatus,
         comprobante: o.comprobante,
@@ -270,11 +252,7 @@ export const db = {
         customerName: o.customerName,
         customerEmail: o.customerEmail,
         customerPhone: o.customerPhone,
-        items: o.items.map((item: any) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.price,
-        })),
+        items: o.items.map(mapOrderItem),
         total: o.total,
         status: o.status as OrderStatus,
         comprobante: o.comprobante,
@@ -294,11 +272,7 @@ export const db = {
         customerName: o.customerName,
         customerEmail: o.customerEmail,
         customerPhone: o.customerPhone,
-        items: o.items.map((item: any) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.price,
-        })),
+        items: o.items.map(mapOrderItem),
         total: o.total,
         status: o.status as OrderStatus,
         createdAt: o.createdAt,
@@ -334,11 +308,7 @@ export const db = {
         customerName: order.customerName,
         customerEmail: order.customerEmail,
         customerPhone: order.customerPhone,
-        items: order.items.map((item: any) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.price,
-        })),
+        items: order.items.map(mapOrderItem),
         total: order.total,
         status: order.status as OrderStatus,
         createdAt: order.createdAt,
@@ -436,6 +406,7 @@ export const db = {
               productId: item.productId,
               quantity: item.quantity,
               price: item.price,
+              size: item.size,  // Talle seleccionado
             })),
           },
         },
@@ -446,11 +417,7 @@ export const db = {
         customerName: order.customerName,
         customerEmail: order.customerEmail,
         customerPhone: order.customerPhone,
-        items: order.items.map((item: any) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          price: item.price,
-        })),
+        items: order.items.map(mapOrderItem),
         total: order.total,
         status: order.status as OrderStatus,
         createdAt: order.createdAt,
@@ -470,11 +437,7 @@ export const db = {
           customerName: order.customerName,
           customerEmail: order.customerEmail,
           customerPhone: order.customerPhone,
-          items: order.items.map((item: any) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-          })),
+          items: order.items.map(mapOrderItem),
           total: order.total,
           status: order.status as OrderStatus,
           createdAt: order.createdAt,
@@ -748,6 +711,20 @@ export const db = {
     },
 
     /**
+     * Obtener intentos de un IP específico (últimas N horas)
+     */
+    getByIP: async (clientIp: string, hoursBack: number = 1) => {
+      const since = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+      return prisma.securityLog.findMany({
+        where: {
+          clientIp,
+          createdAt: { gte: since },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    },
+
+    /**
      * Obtener intentos por razón (ej: rate_limit, fraud)
      */
     getByReason: async (reason: string, hoursBack: number = 24) => {
@@ -758,6 +735,115 @@ export const db = {
           createdAt: { gte: since },
         },
         orderBy: { createdAt: 'desc' },
+      });
+    },
+  },
+
+  /**
+   * PHASE 4: User management para Admin + Staff
+   */
+  user: {
+    create: async (email: string, password_hash: string, role: 'ADMIN' | 'STAFF', createdBy?: string) => {
+      return prisma.user.create({
+        data: {
+          email: email.toLowerCase(),
+          password_hash,
+          role,
+          createdBy: createdBy || null,
+        },
+      });
+    },
+
+    findByEmail: async (email: string) => {
+      return prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+      });
+    },
+
+    findById: async (id: string) => {
+      return prisma.user.findUnique({
+        where: { id },
+      });
+    },
+
+    findAll: async (role?: 'ADMIN' | 'STAFF') => {
+      if (role) {
+        return prisma.user.findMany({
+          where: { role, active: true },
+          select: { id: true, email: true, role: true, createdAt: true },
+        });
+      }
+      return prisma.user.findMany({
+        where: { active: true },
+        select: { id: true, email: true, role: true, createdAt: true },
+      });
+    },
+
+    updatePassword: async (id: string, newPasswordHash: string) => {
+      return prisma.user.update({
+        where: { id },
+        data: { password_hash: newPasswordHash },
+      });
+    },
+
+    deactivate: async (id: string) => {
+      return prisma.user.update({
+        where: { id },
+        data: { active: false },
+      });
+    },
+  },
+
+  /**
+   * PHASE 4: Token blacklist para invalidar JWT
+   */
+  blacklistedToken: {
+    create: async (
+      tokenHash: string,
+      userId: string,
+      tokenType: 'ACCESS' | 'REFRESH',
+      expiresAt: Date,
+      reason: string = 'logout'
+    ) => {
+      return prisma.blacklistedToken.create({
+        data: {
+          token_hash: tokenHash,
+          user_id: userId,
+          token_type: tokenType as any,
+          expires_at: expiresAt,
+          reason,
+        },
+      });
+    },
+
+    findByHash: async (tokenHash: string) => {
+      return prisma.blacklistedToken.findUnique({
+        where: { token_hash: tokenHash },
+      });
+    },
+
+    isBlacklisted: async (tokenHash: string): Promise<boolean> => {
+      const entry = await prisma.blacklistedToken.findUnique({
+        where: { token_hash: tokenHash },
+      });
+      return !!entry;
+    },
+
+    deleteExpired: async () => {
+      // Cleanup tokens que ya expiraron
+      const deleted = await prisma.blacklistedToken.deleteMany({
+        where: {
+          expires_at: { lt: new Date() },
+        },
+      });
+      console.log(`[BlacklistedToken] Cleaned up ${deleted.count} expired entries`);
+      return deleted.count;
+    },
+
+    deleteByUserId: async (userId: string) => {
+      // Logout all sessions de un usuario
+      return prisma.blacklistedToken.deleteMany({
+        where: { user_id: userId },
       });
     },
   },

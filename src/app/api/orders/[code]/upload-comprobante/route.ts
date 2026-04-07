@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { validateComprobante } from '@/lib/validators';
-import { notifyAdminNewComprobante } from '@/lib/email';
+import { sendNewOrderNotificationToUser, sendNewOrderNotificationToAdmin } from '@/lib/email';
 
 /**
  * POST /api/orders/[code]/upload-comprobante
@@ -75,7 +75,15 @@ export async function POST(
       const formData = await request.formData();
       const file = formData.get('comprobante') as File | null;
 
+      console.log(`📸 FormData received for ${code}:`, {
+        fileExists: !!file,
+        fileName: file?.name,
+        fileSize: file?.size,
+        fileType: file?.type,
+      });
+
       if (!file || file.size === 0) {
+        console.error(`❌ No file provided for ${code}`);
         return NextResponse.json(
           { error: 'No se envió archivo de comprobante' },
           { status: 400 }
@@ -87,6 +95,12 @@ export async function POST(
       const bytes = new Uint8Array(buffer);
       comprobante = Buffer.from(bytes).toString('base64');
       comprobanteMime = file.type;
+
+      console.log(`✅ File converted to base64 for ${code}:`, {
+        comprobanteMimeType: comprobanteMime,
+        base64Length: comprobante.length,
+        firstChars: comprobante.substring(0, 20),
+      });
     } catch (error) {
       console.error('Error parsing FormData:', error);
       return NextResponse.json(
@@ -107,10 +121,24 @@ export async function POST(
     // Actualizar orden: agregar comprobante y cambiar status
     const updatedOrder = await db.order.uploadReceipt(code, comprobante, comprobanteMime);
 
+    console.log(`✅ COMPROBANTE UPLOADED: ${code}`, {
+      comprobanteSaved: !!updatedOrder.comprobante,
+      comprobanteMimeSaved: !!updatedOrder.comprobanteMime,
+      'comprobante.length': updatedOrder.comprobante?.length || 0,
+      status: updatedOrder.status,
+    });
+
     console.log(`✅ COMPROBANTE UPLOADED: ${code} | Status: PENDING_PAYMENT → PAYMENT_REVIEW`);
 
-    // 📧 Notificar al admin que hay un comprobante para revisar
-    await notifyAdminNewComprobante(
+    // 📧 Enviar emails: usuario + admin
+    await sendNewOrderNotificationToUser(
+      code,
+      updatedOrder.customerEmail,
+      updatedOrder.customerName,
+      updatedOrder.total
+    );
+
+    await sendNewOrderNotificationToAdmin(
       code,
       updatedOrder.customerName,
       updatedOrder.customerEmail,

@@ -23,10 +23,10 @@ export function middleware(request: NextRequest) {
 
   // 2. Rutas públicas para usuarios invitados (compra sin autenticación)
   if (pathname === '/' || 
-      pathname === '/checkout' ||
-      pathname === '/checkout/blocked' ||
-      pathname === '/checkout/failure' ||
-      pathname === '/checkout/success' ||
+      pathname === '/pagar' ||
+      pathname === '/pagar/bloqueado' ||
+      pathname === '/pagar/error' ||
+      pathname === '/pagar/exito' ||
       pathname.startsWith('/pedido/')) {
     return NextResponse.next();
   }
@@ -42,11 +42,19 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 4. API públicos (ej: crear pedido)
-  if (pathname.startsWith('/api/auth/login') || 
-      pathname.startsWith('/api/auth/refresh') ||
-      pathname.startsWith('/api/orders') ||
-      pathname.startsWith('/api/products')) {
+  // 4. API PÚBLICOS - RUTAS QUE NO REQUIEREN AUTENTICACIÓN
+  // IMPORTANTE: Cuando agregues nuevos endpoints públicos, agregarlos AQUÍ
+  // SIN excepción - si no está aquí, middleware los bloquea
+  const publicApiRoutes = [
+    '/api/auth/login',           // Login guest + admin
+    '/api/auth/refresh',         // Refresh JWT tokens
+    '/api/orders',               // Crear orden + GET orden específica
+    '/api/products',             // Listar productos
+    '/api/polling-config',       // Config de polling (cliente lee esto)
+    '/api/debug/',               // Debug endpoints (dev only)
+  ];
+  
+  if (publicApiRoutes.some(route => pathname.startsWith(route))) {
     return NextResponse.next();
   }
 
@@ -94,7 +102,7 @@ export const config = {
     // Solo proteger rutas administrativas
     '/despacho/:path*',
     '/admin/:path*',
-    // Las demás rutas (/, /checkout, /pedido, /login) serán manejadas por el middleware
+    // Las demás rutas (/, /pagar, /pedido, /login) serán manejadas por el middleware
     // pero se permitirán sin autenticación (ver lógica arriba)
   ],
 };

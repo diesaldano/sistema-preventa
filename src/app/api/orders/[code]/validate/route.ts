@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { sendPaymentConfirmedToUser } from '@/lib/email';
 
 /**
  * POST /api/orders/[code]/validate
@@ -57,6 +58,13 @@ export async function POST(
     const updatedOrder = await db.order.updateStatus(code, 'PAID');
 
     console.log(`✅ ORDER VALIDATED: ${code} | ${order.status} → PAID`);
+
+    // 📧 Notificar al usuario que su pago fue confirmado
+    await sendPaymentConfirmedToUser(
+      code,
+      updatedOrder.customerEmail,
+      updatedOrder.customerName
+    );
 
     return NextResponse.json(updatedOrder);
   } catch (error) {

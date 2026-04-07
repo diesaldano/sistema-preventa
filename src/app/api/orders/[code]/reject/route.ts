@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { sendPaymentRejectedToUser } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -25,6 +26,14 @@ export async function POST(
     }
 
     const updatedOrder = await db.order.updateStatus(code, 'CANCELLED');
+
+    // 📧 Notificar al usuario que su pago fue rechazado
+    await sendPaymentRejectedToUser(
+      code,
+      updatedOrder.customerEmail,
+      updatedOrder.customerName
+    );
+
     return NextResponse.json(updatedOrder);
   } catch (error) {
     console.error('Error rejecting order:', error);

@@ -128,7 +128,7 @@ export function CartSummary() {
 
       {/* Checkout Button */}
       <Link
-        href="/checkout"
+        href="/pagar"
         className={`block w-full rounded-md px-3 py-2.5 text-center font-semibold transition-all hover:shadow-lg active:scale-95 duration-200 text-sm mb-2 ${
           isDark
             ? 'bg-slate-800 hover:bg-slate-700 text-white hover:shadow-slate-800/30'

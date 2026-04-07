@@ -9,6 +9,12 @@ import { formatPrice } from '@/lib/utils';
 import { BrandHeader } from '@/components/brand-header';
 import { Order } from '@/lib/types';
 
+declare global {
+  interface Window {
+    html2pdf?: any;
+  }
+}
+
 function OrderDisplay({ order, isDark, isPolling, lastUpdate }: { order: Order; isDark: boolean; isPolling: boolean; lastUpdate: Date | null }) {
   const orderRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -16,7 +22,6 @@ function OrderDisplay({ order, isDark, isPolling, lastUpdate }: { order: Order; 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
   const [localOrder, setLocalOrder] = useState(order);
 
   const getStatusBadgeColor = (status: string) => {
@@ -70,26 +75,55 @@ function OrderDisplay({ order, isDark, isPolling, lastUpdate }: { order: Order; 
     document.body.removeChild(link);
   };
 
-  const sendComprobanteByEmail = async () => {
-    setSendingEmail(true);
+  const downloadTicket = async () => {
     try {
-      const response = await fetch(`/api/orders/${order.code}/send-comprobante-email`, {
-        method: 'POST',
-      });
-
-      const data = await response.json();
-
+      console.log(`📥 Descargando ticket para ${order.code}...`);
+      
+      // Descargar HTML del ticket
+      const response = await fetch(`/api/orders/${order.code}/ticket`);
+      
       if (!response.ok) {
-        throw new Error(data.error || 'Error al enviar comprobante');
+        throw new Error('No se pudo descargar el ticket');
       }
 
-      toast.success(`Comprobante enviado a ${localOrder.customerEmail}`, '📧 Enviado');
+      const html = await response.text();
+
+      // Verificar si html2pdf está disponible
+      if (window.html2pdf) {
+        console.log('✅ html2pdf disponible, generando PDF...');
+        
+        const element = document.createElement('div');
+        element.innerHTML = html;
+
+        const opt = {
+          margin: 5,
+          filename: `ticket-${order.code}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' },
+        };
+
+        window.html2pdf().set(opt).from(element).save();
+      } else {
+        console.log('⚠️ html2pdf no disponible, descargando HTML...');
+        
+        // Descargar como HTML si html2pdf no está disponible
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ticket-${order.code}.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+
+      toast.success('✅ Ticket descargado correctamente', '📥 Éxito');
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Error al enviar email';
+      const errorMsg = err instanceof Error ? err.message : 'Error al descargar ticket';
       toast.error(errorMsg, '❌ Error');
-      console.error('Error sending comprobante:', err);
-    } finally {
-      setSendingEmail(false);
+      console.error('Error downloading ticket:', err);
     }
   };
 
@@ -244,156 +278,34 @@ function OrderDisplay({ order, isDark, isPolling, lastUpdate }: { order: Order; 
         <p className={`text-2xl font-bold font-bebas tracking-wide ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{formatPrice(localOrder.total)}</p>
       </div>
 
-      {/* 📸 UPLOAD COMPROBANTE - Solo si PENDING_PAYMENT sin comprobante */}
-      {localOrder.status === 'PENDING_PAYMENT' && !localOrder.comprobante && (
-        <div className={`mb-6 rounded-xl border-3 p-6 transition-all ${
-          isDark
-            ? 'border-red-500/80 bg-red-600/30 shadow-lg shadow-red-600/20'
-            : 'border-red-500 bg-red-100/50 shadow-lg shadow-red-400/30'
-        }`}>
-          <h3 className={`font-bold text-lg mb-4 ${isDark ? 'text-red-100' : 'text-red-900'}`}>
-            ⚠️ COMPROBANTE OBLIGATORIO
-          </h3>
-          <p className={`text-sm mb-4 ${isDark ? 'text-red-200/90' : 'text-red-800/90'}`}>
-            Debes subir tu comprobante de pago para que nuestro equipo pueda revisar y validar tu transferencia.
-          </p>
 
-          {uploadError && (
-            <div className={`mb-4 p-3 rounded ${isDark ? 'bg-red-900/40 text-red-200 border border-red-500/30' : 'bg-red-200 text-red-900 border border-red-400'}`}>
-              {uploadError}
-            </div>
-          )}
-
-          {uploadSuccess && (
-            <div className={`mb-4 p-3 rounded ${isDark ? 'bg-emerald-900/40 text-emerald-200 border border-emerald-500/30' : 'bg-emerald-200 text-emerald-900 border border-emerald-400'}`}>
-              ✅ ¡Comprobante subido correctamente! Cambiarás a "Revisión de pago" en segundos...
-            </div>
-          )}
-
-          <div
-            className={`border-2 border-dashed p-8 rounded-lg text-center transition-all cursor-pointer ${
-              isDark
-                ? 'border-red-400/50 hover:border-red-400 hover:bg-red-500/10'
-                : 'border-red-300 hover:border-red-400 hover:bg-red-50'
-            }`}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              const file = e.dataTransfer.files[0];
-              if (file) handleUploadComprobante(file);
-            }}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <p className={`font-bold text-lg mb-2 ${isDark ? 'text-red-200' : 'text-red-900'}`}>
-              📁 Arrastra tu comprobante aquí
-            </p>
-            <p className={`text-sm ${isDark ? 'text-red-300/70' : 'text-red-700/70'}`}>
-              o haz clic para seleccionar (JPG, PNG, PDF - máx 5MB)
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".jpg,.jpeg,.png,.pdf"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleUploadComprobante(file);
-              }}
-              disabled={uploading}
-            />
-          </div>
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className={`w-full mt-4 py-3 px-4 rounded-lg font-bold transition-all active:scale-95 ${
-              isDark
-                ? 'bg-red-600 hover:bg-red-500 text-white disabled:opacity-50'
-                : 'bg-red-600 hover:bg-red-700 text-white disabled:opacity-50'
-            }`}
-          >
-            {uploading ? '⏳ Subiendo...' : '📤 Seleccionar Comprobante'}
-          </button>
-        </div>
-      )}
-
-      {/* Ultra Prominent Receipt Download Section */}
-      {localOrder.comprobante && (
-        <div className={`mb-6 rounded-xl border-3 p-5 animate-pulse transition-all ${
-          isDark
-            ? 'border-green-500/80 bg-gradient-to-r from-green-500/20 to-emerald-500/20 shadow-lg shadow-green-500/20'
-            : 'border-green-500 bg-gradient-to-r from-green-100 to-emerald-100 shadow-lg shadow-green-400/40'
-        }`}>
-          <div className="flex items-center gap-3 mb-3">
-            <div className={`text-3xl animate-bounce`}>📋</div>
-            <div>
-              <p className={`font-bold text-lg ${
-                isDark ? 'text-green-400' : 'text-green-700'
-              }`}>
-                ⬇️ ¡DESCARGA TU COMPROBANTE!
-              </p>
-              <p className={`text-xs font-medium ${
-                isDark ? 'text-green-300/80' : 'text-green-700'
-              }`}>
-                Guarda tu comprobante de pago y preséntalo en caja
-              </p>
-            </div>
-          </div>
-          
-          {/* Dos botones: Descargar y Enviar Email */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              onClick={downloadComprobante}
-              className={`font-bold py-3 px-4 rounded-lg text-lg transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg ${
-                isDark
-                  ? 'bg-green-600 hover:bg-green-500 text-white hover:shadow-green-600/50'
-                  : 'bg-green-600 hover:bg-green-700 text-white hover:shadow-green-600/50'
-              }`}
-            >
-              <span>📥 Descargar</span>
-            </button>
-            
-            <button
-              onClick={sendComprobanteByEmail}
-              disabled={sendingEmail}
-              className={`font-bold py-3 px-4 rounded-lg text-lg transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg ${
-                isDark
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 hover:shadow-blue-600/50'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 hover:shadow-blue-600/50'
-              }`}
-            >
-              <span>{sendingEmail ? '⏳ Enviando...' : '📧 Enviar a Email'}</span>
-            </button>
-          </div>
-          
-          <p className={`text-xs text-center mt-3 ${
-            isDark ? 'text-green-300/60' : 'text-green-700/60'
-          }`}>
-            Guárdalo en tu teléfono o recíbelo en tu email: {localOrder.customerEmail}
-          </p>
-        </div>
-      )}
-
-      {/* Screenshot Backup Button */}
-      <div className={`mb-6 rounded-lg border-2 p-4 ${
+      {/* 📋 DESCARGAR ORDEN DE PEDIDO - Siempre disponible */}
+      <div className={`mb-6 rounded-xl border-3 p-6 transition-all ${
         isDark
-          ? 'border-blue-500/50 bg-blue-500/10'
-          : 'border-blue-400 bg-blue-50'
+          ? 'border-blue-500/80 bg-blue-600/30 shadow-lg shadow-blue-500/20'
+          : 'border-blue-500 bg-blue-100/50 shadow-lg shadow-blue-400/30'
       }`}>
-        <p className={`text-sm font-medium mb-3 ${
-          isDark ? 'text-blue-300' : 'text-blue-700'
-        }`}>
-          📸 Por si acaso, también puedes capturar esta pantalla:
-        </p>
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`text-3xl`}>📋</div>
+          <div>
+            <p className={`font-bold text-lg ${isDark ? 'text-blue-100' : 'text-blue-900'}`}>
+              Orden de Pedido
+            </p>
+            <p className={`text-xs font-medium ${isDark ? 'text-blue-200/80' : 'text-blue-800'}`}>
+              Descargar tu comprobante de compra con todos los detalles
+            </p>
+          </div>
+        </div>
+
         <button
-          onClick={captureScreenshot}
-          className={`w-full py-2 px-4 rounded-lg font-semibold transition-all active:scale-95 ${
+          onClick={downloadTicket}
+          className={`w-full font-bold py-3 px-4 rounded-lg text-lg transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg ${
             isDark
-              ? 'bg-blue-600 hover:bg-blue-500 text-white'
-              : 'bg-blue-500 hover:bg-blue-600 text-white'
+              ? 'bg-blue-600 hover:bg-blue-500 text-white hover:shadow-blue-600/50'
+              : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-blue-600/50'
           }`}
         >
-          📸 Capturar Pantalla del Pedido
+          <span>📥 Descargar Orden de Pedido</span>
         </button>
       </div>
 

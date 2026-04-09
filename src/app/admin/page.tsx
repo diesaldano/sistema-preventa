@@ -274,6 +274,16 @@ export default function AdminPage() {
           >
             📊 Ver Analytics y Reportes
           </Link>
+          <Link
+            href="/admin/security-logs"
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+              isDark
+                ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                : 'bg-slate-600 hover:bg-slate-700 text-white'
+            }`}
+          >
+            🛡️ Security Logs
+          </Link>
         </div>
 
         {hasError && (

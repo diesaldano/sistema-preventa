@@ -102,6 +102,14 @@ export default function AnalyticsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  // CSV Export state
+  const [exportStatus, setExportStatus] = useState('');
+  const [exportDateFrom, setExportDateFrom] = useState('');
+  const [exportDateTo, setExportDateTo] = useState('');
+  const [exportOrderStatus, setExportOrderStatus] = useState('ALL');
+  const [exportCustomer, setExportCustomer] = useState('');
+  const [exporting, setExporting] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
@@ -154,6 +162,40 @@ export default function AnalyticsPage() {
     }
   }
 
+  async function handleExportCSV() {
+    setExporting(true);
+    setExportStatus('');
+    try {
+      const res = await fetch('/api/admin/export/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dateFrom: exportDateFrom || undefined,
+          dateTo: exportDateTo || undefined,
+          status: exportOrderStatus !== 'ALL' ? exportOrderStatus : undefined,
+          customer: exportCustomer || undefined,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Error al exportar');
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pedidos-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setExportStatus('CSV descargado');
+    } catch (err) {
+      setExportStatus(err instanceof Error ? err.message : 'Error al exportar');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   // Find peak hour
   const peakHour = data?.peakHours?.[0];
   // Max count for bar chart scaling
@@ -176,14 +218,22 @@ export default function AnalyticsPage() {
 
       <div className="mx-auto max-w-6xl px-6 py-8">
         {/* Navigation */}
-        <div className="mb-6">
+        <div className="flex items-center gap-4 mb-6">
           <Link
             href="/admin"
             className={`inline-flex items-center gap-2 text-sm font-medium transition ${
               isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            ← Volver al Panel de Validación
+            ← Panel de Validación
+          </Link>
+          <Link
+            href="/admin/security-logs"
+            className={`inline-flex items-center gap-2 text-sm font-medium transition ${
+              isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            🛡️ Security Logs
           </Link>
         </div>
 
@@ -493,6 +543,102 @@ export default function AnalyticsPage() {
                   </table>
                 </div>
               )}
+            </div>
+
+            {/* === ROW 6: Export Orders to CSV === */}
+            <div className={`rounded-xl border p-6 transition-colors ${
+              isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-slate-50'
+            }`}>
+              <h3 className={`text-lg font-semibold mb-4 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                Exportar Pedidos a CSV
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                <div>
+                  <label className={`text-xs font-medium block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Desde
+                  </label>
+                  <input
+                    type="date"
+                    value={exportDateFrom}
+                    onChange={(e) => setExportDateFrom(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${
+                      isDark
+                        ? 'bg-slate-800 border-slate-700 text-slate-200'
+                        : 'bg-white border-slate-300 text-slate-800'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className={`text-xs font-medium block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Hasta
+                  </label>
+                  <input
+                    type="date"
+                    value={exportDateTo}
+                    onChange={(e) => setExportDateTo(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${
+                      isDark
+                        ? 'bg-slate-800 border-slate-700 text-slate-200'
+                        : 'bg-white border-slate-300 text-slate-800'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className={`text-xs font-medium block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Estado
+                  </label>
+                  <select
+                    value={exportOrderStatus}
+                    onChange={(e) => setExportOrderStatus(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${
+                      isDark
+                        ? 'bg-slate-800 border-slate-700 text-slate-200'
+                        : 'bg-white border-slate-300 text-slate-800'
+                    }`}
+                  >
+                    <option value="ALL">Todos</option>
+                    <option value="PENDING_PAYMENT">Pendiente</option>
+                    <option value="PAYMENT_REVIEW">En Revisión</option>
+                    <option value="PAID">Confirmado</option>
+                    <option value="REDEEMED">Entregado</option>
+                    <option value="CANCELLED">Cancelado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`text-xs font-medium block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Cliente
+                  </label>
+                  <input
+                    type="text"
+                    value={exportCustomer}
+                    onChange={(e) => setExportCustomer(e.target.value)}
+                    placeholder="Nombre o email..."
+                    className={`w-full px-3 py-2 rounded-lg text-sm border ${
+                      isDark
+                        ? 'bg-slate-800 border-slate-700 text-slate-200 placeholder:text-slate-600'
+                        : 'bg-white border-slate-300 text-slate-800 placeholder:text-slate-400'
+                    }`}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleExportCSV}
+                  disabled={exporting}
+                  className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition ${
+                    isDark
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50'
+                  }`}
+                >
+                  {exporting ? 'Exportando...' : 'Descargar CSV'}
+                </button>
+                {exportStatus && (
+                  <span className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    {exportStatus}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ) : null}

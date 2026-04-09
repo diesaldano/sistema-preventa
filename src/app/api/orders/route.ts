@@ -256,6 +256,7 @@ export async function POST(request: NextRequest) {
     // 1. La orden se crea efectivamente (atomicidad)
     // 2. Si hay error, NADA se guarda (rollback automático)
     // 3. Previene race conditions entre check y create
+    // 4. Stock se decrementa atómicamente junto con la creación
     const createdOrder = await prisma.$transaction(async (tx) => {
       // Segunda validación dentro de transacción (por si acaso)
       // para asegurar que no hay orden duplicada justo en este momento
@@ -270,6 +271,20 @@ export async function POST(request: NextRequest) {
 
       if (recentOrder) {
         throw new Error('DUPLICATE_ORDER_IN_TRANSACTION');
+      }
+
+      // ✅ Decrementar stock de cada producto DENTRO de la transacción
+      // Esto garantiza que si la creación falla, el stock no se reduce
+      for (const item of itemsValidation.validatedItems!) {
+        const updated = await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        });
+
+        // Verificar que el stock no quedó negativo (race condition protection)
+        if (updated.stock < 0) {
+          throw new Error(`INSUFFICIENT_STOCK:${item.productId}`);
+        }
       }
 
       return tx.order.create({ data: orderData });
@@ -293,6 +308,22 @@ export async function POST(request: NextRequest) {
       );
       const response = NextResponse.json(
         { error: 'Duplicate order detected during processing. Please try again.' },
+        { status: 409 }
+      );
+      return addSecurityHeaders(response);
+    }
+
+    // ✅ Manejo de error de stock insuficiente (race condition detectada en transacción)
+    if (error instanceof Error && error.message.startsWith('INSUFFICIENT_STOCK:')) {
+      const productId = error.message.split(':')[1];
+      await logSecurityEvent(
+        clientIP,
+        'unknown',
+        'stock_issue',
+        `Insufficient stock detected in transaction for product: ${productId}`
+      );
+      const response = NextResponse.json(
+        { error: 'One or more products ran out of stock. Please review your cart and try again.', field: 'items' },
         { status: 409 }
       );
       return addSecurityHeaders(response);

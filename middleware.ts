@@ -9,7 +9,7 @@ import jwt from 'jsonwebtoken';
 
 export const runtime = 'nodejs'; // ← Necesario para usar jsonwebtoken
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-min-32-characters-long!!!!!';
+const JWT_SECRET = process.env.JWT_SECRET || '';
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -63,6 +63,12 @@ export function middleware(request: NextRequest) {
 
   // Sin token: redirigir a /login
   if (!token) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  // Sin JWT_SECRET configurado: no se puede verificar tokens → denegar acceso
+  if (!JWT_SECRET) {
+    console.error('[Middleware] JWT_SECRET no configurado. Denegando acceso a ruta protegida.');
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

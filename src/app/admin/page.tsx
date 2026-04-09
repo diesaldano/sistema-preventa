@@ -284,6 +284,16 @@ export default function AdminPage() {
           >
             🛡️ Security Logs
           </Link>
+          <Link
+            href="/admin/users"
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+              isDark
+                ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                : 'bg-purple-600 hover:bg-purple-700 text-white'
+            }`}
+          >
+            👥 Gestión de Usuarios
+          </Link>
         </div>
 
         {hasError && (

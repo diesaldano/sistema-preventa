@@ -20,6 +20,7 @@ import {
   checkDuplicateOrder,
   logSecurityEvent
 } from '@/lib/rate-limiter';
+import { sendNewOrderNotificationToAdmin } from '@/lib/email';
 
 /**
  * Extraer IP del cliente desde headers
@@ -291,6 +292,14 @@ export async function POST(request: NextRequest) {
     });
     
     console.log(`✅ ORDER CREATED (ATOMIC): ${code} | Email: ${normalizedEmail} | IP: ${clientIP} | Total: $${serverTotal}`);
+
+    // 📧 Notificar al admin que hay un nuevo pedido para validar
+    sendNewOrderNotificationToAdmin(
+      code,
+      sanitizedName,
+      normalizedEmail,
+      serverTotal
+    ).catch((err) => console.error('Error sending admin notification:', err));
 
     const response = NextResponse.json(createdOrder, { status: 201 });
     return addSecurityHeaders(response);

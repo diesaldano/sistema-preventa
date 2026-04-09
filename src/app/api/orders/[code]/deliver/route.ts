@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { verifyAccessToken } from '@/lib/auth';
+import { logActivity } from '@/lib/activity-log';
 
 /**
  * POST /api/orders/[code]/deliver
@@ -53,6 +55,16 @@ export async function POST(
 
     // Staff entrega → REDEEMED (FINAL)
     const updatedOrder = await db.order.updateStatus(code, 'REDEEMED');
+
+    // Log activity
+    const token = request.cookies.get('accessToken')?.value;
+    if (token) {
+      const payload = verifyAccessToken(token);
+      if (payload) {
+        const staffUser = await db.user.findById(payload.userId);
+        await logActivity(payload.userId, staffUser?.email || 'unknown', 'order_redeem', code, 'PAID → REDEEMED');
+      }
+    }
 
     return NextResponse.json(updatedOrder);
   } catch (error) {

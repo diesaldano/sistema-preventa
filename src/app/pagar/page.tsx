@@ -15,7 +15,7 @@ import {
 } from '@/lib/utils';
 import { BANK_DATA, CHECKOUT_CONFIG } from '@/lib/constants';
 import CheckoutStepper from '@/components/checkout-stepper';
-import { AlertCircle, Upload, X, CheckCircle, Clock } from 'lucide-react';
+import { AlertCircle, Upload, X, CheckCircle, Clock, Download } from 'lucide-react';
 import { BrandHeader } from '@/components/brand-header';
 
 const STEPS = [
@@ -311,6 +311,27 @@ export default function CheckoutPage() {
       }
       clearCart();
       router.push(`/pedido/${orderCode}`);
+    }
+  };
+
+  const handleDownloadTicket = async () => {
+    if (!orderCode) return;
+    try {
+      const response = await fetch(`/api/orders/${orderCode}/ticket`);
+      if (!response.ok) throw new Error('No se pudo descargar el comprobante');
+      const html = await response.text();
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ticket-${orderCode}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading ticket:', err);
+      setError(err instanceof Error ? err.message : 'Error al descargar comprobante');
     }
   };
 
@@ -895,7 +916,7 @@ export default function CheckoutPage() {
                     </li>
                   </ul>
                 </div>
-                <div className="pt-4 flex justify-center">
+                <div className="pt-4 flex flex-col items-center gap-3">
                   <button
                     onClick={handleViewOrder}
                     className={`inline-flex items-center gap-2 rounded-lg px-8 py-2 text-sm font-semibold transition ${
@@ -905,6 +926,17 @@ export default function CheckoutPage() {
                     }`}
                   >
                     Ver Estado de Mi Pedido →
+                  </button>
+                  <button
+                    onClick={handleDownloadTicket}
+                    className={`inline-flex items-center gap-2 rounded-lg px-8 py-2 text-sm font-semibold transition ${
+                      isDark
+                        ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    <Download size={16} />
+                    Descargar Comprobante
                   </button>
                 </div>
               </div>

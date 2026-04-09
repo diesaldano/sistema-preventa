@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sendPaymentRejectedToUser } from '@/lib/email';
+import { verifyAccessToken } from '@/lib/auth';
+import { logActivity } from '@/lib/activity-log';
 
 export async function POST(
   request: NextRequest,
@@ -26,6 +28,16 @@ export async function POST(
     }
 
     const updatedOrder = await db.order.updateStatus(code, 'CANCELLED');
+
+    // Log activity
+    const token = request.cookies.get('accessToken')?.value;
+    if (token) {
+      const payload = verifyAccessToken(token);
+      if (payload) {
+        const adminUser = await db.user.findById(payload.userId);
+        await logActivity(payload.userId, adminUser?.email || 'unknown', 'order_reject', code, `${order.status} → CANCELLED`);
+      }
+    }
 
     // 📧 Notificar al usuario que su pago fue rechazado
     await sendPaymentRejectedToUser(

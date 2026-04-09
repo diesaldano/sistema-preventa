@@ -404,16 +404,29 @@ export default function OrderPage({ params }: { params: Promise<{ code: string }
           </div>
         )}
 
+        {!loading && !order && !error && (
+          <div className={`rounded-lg border p-8 text-center transition-colors ${isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <div className="w-12 h-12 border-4 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
+              </div>
+              <p className={isDark ? 'text-slate-300' : 'text-slate-700'}>Buscando tu pedido...</p>
+            </div>
+          </div>
+        )}
+
         {order && <OrderDisplay order={order} isDark={isDark} isPolling={isPolling} lastUpdate={lastUpdate} />}
 
-        <div className="mt-8 text-center">
-          <Link
-            href="/"
-            className={`inline-block px-6 py-2 rounded-lg font-medium transition-all ${isDark ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-200 text-slate-900 hover:bg-slate-300'}`}
-          >
-            Volver a la tienda
-          </Link>
-        </div>
+        {!loading && (
+          <div className="mt-8 text-center">
+            <Link
+              href="/"
+              className={`inline-block px-6 py-2 rounded-lg font-medium transition-all ${isDark ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-200 text-slate-900 hover:bg-slate-300'}`}
+            >
+              Volver a la tienda
+            </Link>
+          </div>
+        )}
       </div>
     </main>
   );

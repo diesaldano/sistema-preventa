@@ -13,6 +13,7 @@ import {
   generateRefreshToken 
 } from '@/lib/auth';
 import { logSecurityEvent } from '@/lib/rate-limiter';
+import { logActivity } from '@/lib/activity-log';
 
 /**
  * Extraer IP del cliente
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ LOGIN SUCCESS: User ${email} (${user.role}) from IP ${clientIP}`);
     await logSecurityEvent(clientIP, email, 'login_success', `Role: ${user.role}`);
+    await logActivity(user.id, email, 'login', undefined, `IP: ${clientIP}`);
 
     const response = NextResponse.json(
       {

@@ -47,6 +47,12 @@ export default function AdminPage() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [confirmRejectCode, setConfirmRejectCode] = useState<string | null>(null);
 
+  // Comprobante viewer state
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
+  const [receiptData, setReceiptData] = useState<{ comprobante: string; comprobanteMime: string } | null>(null);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+
   // R2.3: Polling config desde servidor - MUST be called unconditionally
   const { data: pollingConfig, mutate: mutatePolling } = useSWR<PollingConfig>(
     '/api/polling-config',
@@ -238,6 +244,23 @@ export default function AdminPage() {
     }
   }
 
+  async function handleViewReceipt(code: string) {
+    setViewingReceipt(code);
+    setReceiptData(null);
+    setReceiptError(null);
+    setReceiptLoading(true);
+    try {
+      const res = await fetch(`/api/orders/${code}/receipt`);
+      if (!res.ok) throw new Error('No se encontró el comprobante');
+      const json = await res.json();
+      setReceiptData(json);
+    } catch (err) {
+      setReceiptError(err instanceof Error ? err.message : 'Error al cargar comprobante');
+    } finally {
+      setReceiptLoading(false);
+    }
+  }
+
   const pendingOrders = orders.filter((o: Order) => o.status === 'PAYMENT_REVIEW' || o.status === 'PENDING_PAYMENT');
   const confirmadoOrders = orders.filter((o: Order) => o.status === 'PAID');
   const deliveredOrders = orders.filter((o: Order) => o.status === 'REDEEMED');
@@ -262,6 +285,94 @@ export default function AdminPage() {
       />
 
       <div className="mx-auto max-w-6xl px-6 py-12">
+        {/* Navigation Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <Link
+            href="/admin/analytics"
+            className={`group rounded-xl border p-5 transition-all duration-300 hover:-translate-y-1 ${
+              isDark
+                ? 'border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-blue-600/5 hover:shadow-lg hover:shadow-blue-500/20 hover:border-blue-400/50'
+                : 'border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:shadow-lg hover:shadow-blue-200/60 hover:border-blue-300'
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">📊</span>
+              <h3 className={`font-semibold text-sm ${isDark ? 'text-blue-300 group-hover:text-blue-200' : 'text-blue-700 group-hover:text-blue-800'}`}>
+                Analytics y Reportes
+              </h3>
+            </div>
+            <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Métricas de ingresos, pedidos y rendimiento</p>
+          </Link>
+
+          <Link
+            href="/admin/security-logs"
+            className={`group rounded-xl border p-5 transition-all duration-300 hover:-translate-y-1 ${
+              isDark
+                ? 'border-slate-700 bg-gradient-to-br from-slate-800/80 to-slate-900/50 hover:shadow-lg hover:shadow-slate-500/10 hover:border-slate-600'
+                : 'border-slate-200 bg-gradient-to-br from-slate-50 to-white hover:shadow-lg hover:shadow-slate-200/60 hover:border-slate-300'
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">🛡️</span>
+              <h3 className={`font-semibold text-sm ${isDark ? 'text-slate-300 group-hover:text-slate-100' : 'text-slate-700 group-hover:text-slate-900'}`}>
+                Security Logs
+              </h3>
+            </div>
+            <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Eventos de seguridad y actividad sospechosa</p>
+          </Link>
+
+          <Link
+            href="/admin/users"
+            className={`group rounded-xl border p-5 transition-all duration-300 hover:-translate-y-1 ${
+              isDark
+                ? 'border-purple-500/30 bg-gradient-to-br from-purple-500/10 to-purple-600/5 hover:shadow-lg hover:shadow-purple-500/20 hover:border-purple-400/50'
+                : 'border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:shadow-lg hover:shadow-purple-200/60 hover:border-purple-300'
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">👥</span>
+              <h3 className={`font-semibold text-sm ${isDark ? 'text-purple-300 group-hover:text-purple-200' : 'text-purple-700 group-hover:text-purple-800'}`}>
+                Gestión de Usuarios
+              </h3>
+            </div>
+            <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Crear, editar y administrar staff</p>
+          </Link>
+
+          <Link
+            href="/admin/activity-logs"
+            className={`group rounded-xl border p-5 transition-all duration-300 hover:-translate-y-1 ${
+              isDark
+                ? 'border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 hover:shadow-lg hover:shadow-emerald-500/20 hover:border-emerald-400/50'
+                : 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white hover:shadow-lg hover:shadow-emerald-200/60 hover:border-emerald-300'
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">📋</span>
+              <h3 className={`font-semibold text-sm ${isDark ? 'text-emerald-300 group-hover:text-emerald-200' : 'text-emerald-700 group-hover:text-emerald-800'}`}>
+                Activity Log
+              </h3>
+            </div>
+            <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Registro de acciones del equipo</p>
+          </Link>
+
+          <Link
+            href="/admin/inventory"
+            className={`group rounded-xl border p-5 transition-all duration-300 hover:-translate-y-1 ${
+              isDark
+                ? 'border-cyan-500/30 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 hover:shadow-lg hover:shadow-cyan-500/20 hover:border-cyan-400/50'
+                : 'border-cyan-200 bg-gradient-to-br from-cyan-50 to-white hover:shadow-lg hover:shadow-cyan-200/60 hover:border-cyan-300'
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">📦</span>
+              <h3 className={`font-semibold text-sm ${isDark ? 'text-cyan-300 group-hover:text-cyan-200' : 'text-cyan-700 group-hover:text-cyan-800'}`}>
+                Inventario
+              </h3>
+            </div>
+            <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Stock en tiempo real y ajustes manuales</p>
+          </Link>
+        </div>
+
         {hasError && (
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300 mb-6">
             Error al cargar los pedidos
@@ -513,6 +624,20 @@ export default function AdminPage() {
                     </p>
                   </div>
 
+                  {/* View Receipt Button */}
+                  <div className="mb-3">
+                    <button
+                      onClick={() => handleViewReceipt(order.code)}
+                      className={`w-full rounded px-3 py-2 text-sm font-semibold transition ${
+                        isDark
+                          ? 'bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-500/30'
+                          : 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
+                      }`}
+                    >
+                      🖼️ Ver Comprobante
+                    </button>
+                  </div>
+
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleValidate(order.code)}
@@ -750,6 +875,78 @@ export default function AdminPage() {
           )}
         </div>
       </div>
+
+      {/* Receipt Viewer Modal */}
+      {viewingReceipt && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => { setViewingReceipt(null); setReceiptData(null); setReceiptError(null); }}
+        >
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className={`relative max-w-2xl w-full max-h-[90vh] overflow-auto rounded-2xl border p-6 ${
+              isDark ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                Comprobante: <span className="font-mono">{viewingReceipt}</span>
+              </h3>
+              <button
+                onClick={() => { setViewingReceipt(null); setReceiptData(null); setReceiptError(null); }}
+                className={`p-2 rounded-lg transition ${
+                  isDark ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-600'
+                }`}
+              >
+                ✕
+              </button>
+            </div>
+
+            {receiptLoading && (
+              <div className="flex items-center justify-center py-12">
+                <div className={`text-center ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <div className="inline-block mb-3 w-10 h-10 border-4 border-current border-t-transparent rounded-full animate-spin" />
+                  <p>Cargando comprobante...</p>
+                </div>
+              </div>
+            )}
+
+            {receiptError && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300">
+                {receiptError}
+              </div>
+            )}
+
+            {receiptData && receiptData.comprobante && (
+              <div className="text-center">
+                {receiptData.comprobanteMime?.startsWith('image/') ? (
+                  <img
+                    src={`data:${receiptData.comprobanteMime};base64,${receiptData.comprobante}`}
+                    alt="Comprobante de pago"
+                    className="max-w-full h-auto rounded-lg border border-slate-200/20 mx-auto"
+                  />
+                ) : receiptData.comprobanteMime === 'application/pdf' ? (
+                  <div className={`p-6 rounded-lg border ${isDark ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}`}>
+                    <p className={`text-sm mb-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>El comprobante es un PDF.</p>
+                    <a
+                      href={`data:application/pdf;base64,${receiptData.comprobante}`}
+                      download={`comprobante-${viewingReceipt}.pdf`}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"
+                    >
+                      📥 Descargar PDF
+                    </a>
+                  </div>
+                ) : (
+                  <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                    Tipo de archivo: {receiptData.comprobanteMime}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }

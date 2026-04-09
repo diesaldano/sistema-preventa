@@ -262,6 +262,20 @@ export default function AdminPage() {
       />
 
       <div className="mx-auto max-w-6xl px-6 py-12">
+        {/* Link to Analytics */}
+        <div className="mb-6">
+          <Link
+            href="/admin/analytics"
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+              isDark
+                ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+          >
+            📊 Ver Analytics y Reportes
+          </Link>
+        </div>
+
         {hasError && (
           <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300 mb-6">
             Error al cargar los pedidos

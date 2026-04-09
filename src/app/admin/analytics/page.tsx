@@ -110,6 +110,9 @@ export default function AnalyticsPage() {
   const [exportCustomer, setExportCustomer] = useState('');
   const [exporting, setExporting] = useState(false);
 
+  // Recent orders filter
+  const [recentOrdersFilter, setRecentOrdersFilter] = useState('ALL');
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/login');
@@ -500,49 +503,79 @@ export default function AnalyticsPage() {
             <div className={`rounded-xl border p-6 transition-colors ${
               isDark ? 'border-slate-800 bg-slate-900' : 'border-slate-200 bg-slate-50'
             }`}>
-              <h3 className={`text-lg font-semibold mb-4 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
-                Últimos Pedidos
-              </h3>
-              {data.recentOrders.length === 0 ? (
-                <p className={`text-sm text-center py-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Sin pedidos recientes
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-                        <th className={`text-left py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Código</th>
-                        <th className={`text-left py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Cliente</th>
-                        <th className={`text-right py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Total</th>
-                        <th className={`text-center py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Estado</th>
-                        <th className={`text-right py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Fecha</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.recentOrders.map((order) => (
-                        <tr key={order.code} className={`border-b last:border-b-0 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
-                          <td className={`py-2 px-2 font-mono font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                            {order.code}
-                          </td>
-                          <td className={`py-2 px-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                            {order.customerName}
-                          </td>
-                          <td className={`py-2 px-2 text-right font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                            {formatPrice(order.total)}
-                          </td>
-                          <td className={`py-2 px-2 text-center text-xs font-semibold ${isDark ? STATUS_COLORS_DARK[order.status] : STATUS_COLORS_LIGHT[order.status]}`}>
-                            {STATUS_LABELS[order.status] || order.status}
-                          </td>
-                          <td className={`py-2 px-2 text-right text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-                            {formatDateTime(order.createdAt)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <h3 className={`text-lg font-semibold ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                  Últimos Pedidos
+                </h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {['ALL', 'PENDING_PAYMENT', 'PAYMENT_REVIEW', 'PAID', 'REDEEMED', 'CANCELLED'].map((st) => {
+                    const isActive = recentOrdersFilter === st;
+                    const label = st === 'ALL' ? 'Todos' : STATUS_LABELS[st] || st;
+                    return (
+                      <button
+                        key={st}
+                        onClick={() => setRecentOrdersFilter(st)}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                          isActive
+                            ? isDark
+                              ? 'bg-white/10 text-white ring-1 ring-white/20'
+                              : 'bg-slate-900 text-white'
+                            : isDark
+                            ? 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+              {(() => {
+                const filteredOrders = recentOrdersFilter === 'ALL'
+                  ? data.recentOrders
+                  : data.recentOrders.filter((o) => o.status === recentOrdersFilter);
+                return filteredOrders.length === 0 ? (
+                  <p className={`text-sm text-center py-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {recentOrdersFilter === 'ALL' ? 'Sin pedidos recientes' : `Sin pedidos con estado: ${STATUS_LABELS[recentOrdersFilter]}`}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className={`border-b ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                          <th className={`text-left py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Código</th>
+                          <th className={`text-left py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Cliente</th>
+                          <th className={`text-right py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Total</th>
+                          <th className={`text-center py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Estado</th>
+                          <th className={`text-right py-2 px-2 font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Fecha</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredOrders.map((order) => (
+                          <tr key={order.code} className={`border-b last:border-b-0 ${isDark ? 'border-slate-800' : 'border-slate-100'}`}>
+                            <td className={`py-2 px-2 font-mono font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                              {order.code}
+                            </td>
+                            <td className={`py-2 px-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                              {order.customerName}
+                            </td>
+                            <td className={`py-2 px-2 text-right font-mono ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                              {formatPrice(order.total)}
+                            </td>
+                            <td className={`py-2 px-2 text-center text-xs font-semibold ${isDark ? STATUS_COLORS_DARK[order.status] : STATUS_COLORS_LIGHT[order.status]}`}>
+                              {STATUS_LABELS[order.status] || order.status}
+                            </td>
+                            <td className={`py-2 px-2 text-right text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                              {formatDateTime(order.createdAt)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* === ROW 6: Export Orders to CSV === */}

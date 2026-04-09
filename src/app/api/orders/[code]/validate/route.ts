@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sendPaymentConfirmedToUser } from '@/lib/email';
+import { verifyAccessToken } from '@/lib/auth';
+import { logActivity } from '@/lib/activity-log';
 
 /**
  * POST /api/orders/[code]/validate
@@ -58,6 +60,16 @@ export async function POST(
     const updatedOrder = await db.order.updateStatus(code, 'PAID');
 
     console.log(`✅ ORDER VALIDATED: ${code} | ${order.status} → PAID`);
+
+    // Log activity
+    const token = request.cookies.get('accessToken')?.value;
+    if (token) {
+      const payload = verifyAccessToken(token);
+      if (payload) {
+        const adminUser = await db.user.findById(payload.userId);
+        await logActivity(payload.userId, adminUser?.email || 'unknown', 'order_validate', code, `${order.status} → PAID`);
+      }
+    }
 
     // 📧 Notificar al usuario que su pago fue confirmado
     await sendPaymentConfirmedToUser(

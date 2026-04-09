@@ -6,7 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, verifyAccessToken } from '@/lib/auth';
+import { logActivity } from '@/lib/activity-log';
 
 export async function PUT(
   request: NextRequest,
@@ -96,6 +97,17 @@ export async function PUT(
       },
     });
 
+    // Log activity
+    const token = request.cookies.get('accessToken')?.value;
+    if (token) {
+      const payload = verifyAccessToken(token);
+      if (payload) {
+        const admin = await prisma.user.findUnique({ where: { id: payload.userId }, select: { email: true } });
+        const changes = Object.keys(updateData).filter(k => k !== 'password_hash').join(', ');
+        await logActivity(payload.userId, admin?.email || 'unknown', 'user_edit', id, `Updated ${existing.email}: ${changes}`);
+      }
+    }
+
     return NextResponse.json({ success: true, data: user });
   } catch (error) {
     console.error('Error updating user:', error);
@@ -122,6 +134,16 @@ export async function DELETE(
     }
 
     await prisma.user.delete({ where: { id } });
+
+    // Log activity
+    const token = request.cookies.get('accessToken')?.value;
+    if (token) {
+      const payload = verifyAccessToken(token);
+      if (payload) {
+        const admin = await prisma.user.findUnique({ where: { id: payload.userId }, select: { email: true } });
+        await logActivity(payload.userId, admin?.email || 'unknown', 'user_delete', id, `Deleted ${existing.email}`);
+      }
+    }
 
     return NextResponse.json({ success: true, message: 'Usuario eliminado' });
   } catch (error) {

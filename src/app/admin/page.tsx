@@ -294,6 +294,26 @@ export default function AdminPage() {
           >
             👥 Gestión de Usuarios
           </Link>
+          <Link
+            href="/admin/activity-logs"
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+              isDark
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+            }`}
+          >
+            📋 Activity Log
+          </Link>
+          <Link
+            href="/admin/inventory"
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+              isDark
+                ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
+                : 'bg-cyan-600 hover:bg-cyan-700 text-white'
+            }`}
+          >
+            📦 Inventario
+          </Link>
         </div>
 
         {hasError && (

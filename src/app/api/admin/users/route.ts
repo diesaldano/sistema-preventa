@@ -6,7 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, verifyAccessToken } from '@/lib/auth';
+import { logActivity } from '@/lib/activity-log';
 
 export async function GET() {
   try {
@@ -89,6 +90,16 @@ export async function POST(request: NextRequest) {
         createdAt: true,
       },
     });
+
+    // Log activity
+    const token = request.cookies.get('accessToken')?.value;
+    if (token) {
+      const payload = verifyAccessToken(token);
+      if (payload) {
+        const admin = await prisma.user.findUnique({ where: { id: payload.userId }, select: { email: true } });
+        await logActivity(payload.userId, admin?.email || 'unknown', 'user_create', user.id, `Created ${emailLower} as ${validRole}`);
+      }
+    }
 
     return NextResponse.json({ success: true, data: user }, { status: 201 });
   } catch (error) {

@@ -14,6 +14,7 @@ import {
   extractTokenFromHeader,
   hashToken,
 } from '@/lib/auth';
+import { logActivity } from '@/lib/activity-log';
 
 function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -101,6 +102,10 @@ export async function POST(request: NextRequest) {
     ]);
 
     console.log(`✅ LOGOUT SUCCESS: User ${userId} from IP ${clientIP}`);
+
+    // Log activity
+    const logUser = await db.user.findById(userId);
+    await logActivity(userId, logUser?.email || 'unknown', 'logout', undefined, `IP: ${clientIP}`);
 
     const response = NextResponse.json(
       { success: true, message: 'Logged out successfully' },

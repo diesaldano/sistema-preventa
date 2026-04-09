@@ -139,3 +139,23 @@ enum TokenType {
   ACCESS
   REFRESH
 }
+
+/**
+ * TIER 2: Activity Log para tracking de acciones de staff/admin
+ * Registra quién hizo qué, cuándo, y sobre qué recurso
+ */
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String   // ID del usuario que realizó la acción
+  userEmail  String   // Email del usuario (para display rápido)
+  action     String   // login, logout, order_validate, order_reject, order_redeem, stock_adjust, user_create, user_edit, user_delete
+  target     String?  // Recurso afectado (ej: order code, product id, user id)
+  details    String?  // Detalles adicionales (ej: "stock +10", "role STAFF -> ADMIN")
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([userEmail])
+  @@index([action])
+  @@index([createdAt])
+  @@map("activity_logs")
+}

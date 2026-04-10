@@ -8,7 +8,7 @@
 
 const CACHE_VERSION = '1';
 const PRODUCT_CACHE_KEY = `products-v${CACHE_VERSION}`;
-const CACHE_TTL = 3600000; // 1 hora en ms
+const CACHE_TTL = process.env.NODE_ENV === 'development' ? 5000 : 3600000; // 5seg en dev, 1h en prod
 
 export interface CacheEntry<T> {
   data: T;

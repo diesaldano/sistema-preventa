@@ -242,12 +242,14 @@ export default function CheckoutPage() {
     setError(null);
 
     try {
+      // ============================================================
+      // STEP 1: Crear orden (sin comprobante)
+      // ============================================================
       const formDataToSend = new FormData();
       formDataToSend.append('customerName', sanitizeName(formData.name));
       formDataToSend.append('customerEmail', formData.email.toLowerCase().trim());
       formDataToSend.append('customerPhone', formData.phone.replace(/\D/g, ''));
       
-      // R1.2 (próximo): El backend recalculará el total
       formDataToSend.append(
         'items',
         JSON.stringify(
@@ -255,17 +257,10 @@ export default function CheckoutPage() {
             productId: item.productId,
             quantity: item.quantity,
             price: item.price,
-            size: item.size,  // Incluir talle seleccionado
+            size: item.size,
           }))
         )
       );
-      
-      // OJO: No enviamos total, backend lo recalcula desde productos BD
-      // formDataToSend.append('total', total.toString());
-
-      if (uploadedFile) {
-        formDataToSend.append('comprobante', uploadedFile);
-      }
 
       const response = await fetch('/api/orders', {
         method: 'POST',
@@ -274,16 +269,13 @@ export default function CheckoutPage() {
 
       const data = await response.json();
 
-      // R1.3: Manejo de doble-creación (409)
       if (response.status === 409) {
         setError(`Ya tienes una orden reciente (${data.recentOrderCode}). Puedes verla en tu historial o espera 5 minutos para crear otra.`);
         setLoading(false);
         return;
       }
 
-      // R1.4: Manejo de rate limiting (429)
       if (response.status === 429) {
-        // Redirigir a página de bloqueo temporal
         router.push('/checkout/blocked');
         return;
       }
@@ -292,7 +284,41 @@ export default function CheckoutPage() {
         throw new Error(data.error ?? 'Error al crear el pedido');
       }
 
-      setOrderCode(data.code);
+      const orderCode = data.code;
+      setOrderCode(orderCode);
+
+      // ============================================================
+      // STEP 2: Subir comprobante (si existe)
+      // ============================================================
+      if (uploadedFile) {
+        try {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const base64 = e.target?.result as string;
+            
+            // POST /api/orders/[code]/upload-comprobante
+            const uploadResponse = await fetch(`/api/orders/${orderCode}/upload-comprobante`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'multipart/form-data' },
+              body: (() => {
+                const fd = new FormData();
+                fd.append('comprobante', uploadedFile);
+                return fd;
+              })(),
+            });
+
+            if (!uploadResponse.ok) {
+              console.warn('⚠️ Comprobante no se cargó, pero orden creada:', orderCode);
+            } else {
+              console.log('✅ Comprobante cargado correctamente');
+            }
+          };
+          reader.readAsDataURL(uploadedFile);
+        } catch (err) {
+          console.error('Error al cargar comprobante:', err);
+        }
+      }
+
       setCurrentStep(4);
       setLoading(false);
     } catch (err) {

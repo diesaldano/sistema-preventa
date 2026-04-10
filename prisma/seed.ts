@@ -25,17 +25,21 @@ async function main() {
   await prisma.user.deleteMany({});
   console.log('✓ Base de datos limpia\n');
 
+  // Obtener contraseñas de variables de entorno
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const staffPassword = process.env.STAFF_PASSWORD || 'staff123';
+
   // Crear usuarios de prueba (Admin y Staff)
   console.log('👥 Creando usuarios de prueba...');
-  const adminPassword = await bcrypt.hash('admin123', 10);
-  const staffPassword = await bcrypt.hash('staff123', 10);
+  const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
+  const hashedStaffPassword = await bcrypt.hash(staffPassword, 10);
 
   const users = await Promise.all([
     prisma.user.create({
       data: {
         id: 'admin-001',
         email: 'admin@preventa.local',
-        password_hash: adminPassword,
+        password_hash: hashedAdminPassword,
         role: 'ADMIN',
         active: true,
       },
@@ -44,7 +48,7 @@ async function main() {
       data: {
         id: 'staff-001',
         email: 'staff1@preventa.local',
-        password_hash: staffPassword,
+        password_hash: hashedStaffPassword,
         role: 'STAFF',
         active: true,
       },
@@ -53,7 +57,7 @@ async function main() {
       data: {
         id: 'staff-002',
         email: 'staff2@preventa.local',
-        password_hash: staffPassword,
+        password_hash: hashedStaffPassword,
         role: 'STAFF',
         active: true,
       },
@@ -64,53 +68,64 @@ async function main() {
   users.forEach((u) => {
     console.log(`  • ${u.email} (${u.role})`);
   });
-  console.log('  Contraseña admin: admin123');
-  console.log('  Contraseña staff: staff123\n');
+  console.log('  ℹ️  Contraseñas configuradas en .env\n');
 
-  // Crear 10 productos realistas
+  // Crear 11 productos realistas
   console.log('🍺 Creando productos...');
   const products = await Promise.all([
     prisma.product.create({
       data: {
-        id: 'agua-mineral',
-        name: 'Agua Mineral',
-        description: 'Lata 355ml - Natural',
-        price: 3000,  // $3.000
-        category: 'bebidas',
-        stock: 300,
-        available: true,
-      },
-    }),
-    prisma.product.create({
-      data: {
-        id: 'coca-cola-lata',
-        name: 'Coca-Cola',
-        description: 'Lata 355ml',
-        price: 6000,  // $6.000
-        category: 'bebidas',
-        stock: 250,
-        available: true,
-      },
-    }),
-    prisma.product.create({
-      data: {
-        id: 'quilmes-lata',
-        name: 'Cerveza Quilmes',
-        description: 'Lata 355ml - Clásica',
-        price: 6000,  // $6.000
+        id: 'pack-quilmes-4',
+        name: 'Pack Cerveza Quilmes 4 Latas',
+        description: 'Pack de 4 latas de cerveza',
+        price: 20000,
         category: 'cerveza',
-        stock: 200,
+        stock: 150,
         available: true,
       },
     }),
     prisma.product.create({
       data: {
-        id: 'stella-artois',
-        name: 'Cerveza Stella Artois',
-        description: 'Lata 354ml - Premium',
-        price: 7000,  // $7.000
-        category: 'cerveza',
-        stock: 180,
+        id: 'combo-fernet-coca',
+        name: 'Combo: Fernet mediano + Coca Grande',
+        description: 'Pack promotivo - Fernet mediano botella + Coca-Cola grande',
+        price: 40000,
+        category: 'combo',
+        stock: 50,
+        available: true,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        id: 'fernet-medianol',
+        name: 'Fernet Mediano',
+        description: 'Vaso de fernet Branca',
+        price: 7000,
+        category: 'bebidas',
+        stock: 120,
+        available: true,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        id: 'remera-salamanca',
+        name: 'Remera Salamanca',
+        description: 'Remera oficial Salamanca',
+        price: 15000,
+        category: 'merch',
+        stock: 100,
+        available: false,
+        sizes: ['S', 'M', 'L', 'XL'],
+      },
+    }),
+    prisma.product.create({
+      data: {
+        id: 'entrada-envio',
+        name: 'Credencial de accesoooo',
+        description: 'Credencial de acceso al show',
+        price: 25000,
+        category: 'entrada',
+        stock: 24,
         available: true,
       },
     }),
@@ -119,66 +134,65 @@ async function main() {
         id: 'remera-diez',
         name: 'Remera',
         description: 'Remera Autos Robados',
-        price: 15000,  // $15.000
+        price: 25000,
         category: 'merch',
-        stock: 100,
+        stock: 98,
         available: true,
-        sizes: ['S', 'M', 'L', 'XL'],  // Tailles disponibles
+        sizes: ['S', 'M', 'L', 'XL'],
       },
     }),
     prisma.product.create({
       data: {
-        id: 'remera-salamanca',
-        name: 'Remera Salamanca',
-        description: 'Remera oficial Salamanca',
-        price: 15000,  // $15.000
-        category: 'merch',
-        stock: 100,
-        available: false,
-        sizes: ['S', 'M', 'L', 'XL'],  // Tailles disponibles
-      },
-    }),
-    prisma.product.create({
-      data: {
-        id: 'entrada-envio',
-        name: 'Entrada + Envío',
-        description: 'Entrada + Envío Cuatro Avenidas, Tucumán',
-        price: 35000,  // $35.000
-        category: 'entrada',
-        stock: 500,
-        available: true,
-      },
-    }),
-    prisma.product.create({
-      data: {
-        id: 'combo-fernet-coca',
-        name: 'Combo: Fernet medianol + Coca Grande',
-        description: 'Pack promotivo - Fernet medianol botella + Coca-Cola grande',
-        price: 40000,  // $40.000
-        category: 'combo',
-        stock: 80,
-        available: true,
-      },
-    }),
-    prisma.product.create({
-      data: {
-        id: 'fernet-medianol',
-        name: 'Fernet Medianol',
-        description: 'Botella 750ml - Bebida alcohólica',
-        price: 8000,  // $8.000
-        category: 'bebidas',
-        stock: 120,
-        available: true,
-      },
-    }),
-    prisma.product.create({
-      data: {
-        id: 'pack-quilmes-4',
-        name: 'Pack Cerveza Quilmes 4 Latas',
-        description: 'Pack 4 latas de 355ml cada una',
-        price: 24000,  // $24.000
+        id: 'stella-artois',
+        name: 'Cerveza Stella Artois',
+        description: 'Lata de cerveza - Premium',
+        price: 7000,
         category: 'cerveza',
-        stock: 150,
+        stock: 180,
+        available: true,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        id: 'agua-mineral',
+        name: 'Agua Mineral',
+        description: 'Lata 355ml - Natural',
+        price: 3000,
+        category: 'bebidas',
+        stock: 93,
+        available: true,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        id: 'coca-cola-lata',
+        name: 'Coca-Cola',
+        description: 'Lata chica',
+        price: 4000,
+        category: 'bebidas',
+        stock: 200,
+        available: true,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        id: 'quilmes-lata',
+        name: 'Cerveza Quilmes',
+        description: 'Lata de cerveza clásica',
+        price: 5000,
+        category: 'cerveza',
+        stock: 200,
+        available: true,
+      },
+    }),
+    prisma.product.create({
+      data: {
+        id: 'combo-robado',
+        name: 'Combo Robado',
+        description: 'Vino con gaseosa',
+        price: 20000,
+        category: 'combo',
+        stock: 100,
         available: true,
       },
     }),

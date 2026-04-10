@@ -20,6 +20,16 @@
 # production
 /build
 
+# ENVIRONMENT VARIABLES - KEEP LOCAL (real credentials)
+.env
+.env.local
+.env.dev
+.env.prod
+.env.*.local
+
+# Template OK to commit
+!.env.example
+
 # misc
 .DS_Store
 *.pem

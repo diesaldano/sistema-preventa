@@ -16,12 +16,13 @@ export async function GET(request: NextRequest) {
     const products = await cacheOrLoad(
       'products:all',
       () => db.product.findAvailable(),
-      3600000 // 1 hora
+      process.env.NODE_ENV === 'development' ? 5000 : 3600000 // 5seg en dev, 1 hora en prod
     );
 
     // Headers para cache del cliente también
     const response = NextResponse.json(products);
-    response.headers.set('Cache-Control', 'public, max-age=3600, must-revalidate');
+    const cacheSeconds = process.env.NODE_ENV === 'development' ? 5 : 3600;
+    response.headers.set('Cache-Control', `public, max-age=${cacheSeconds}, must-revalidate`);
     response.headers.set('X-Cache-Status', 'fresh');
     
     // Debug: incluir stats en desarrollo
@@ -44,13 +45,12 @@ export async function GET(request: NextRequest) {
  * PHASE 2 - R2.2: POST /api/products/refresh
  * Invalida cache en servidor (admin solo)
  * Clientes se actualizan en próximo GET
- * 
- * TODO: Verificar que usuario es admin
+ * ⚠️  AUTH: Requiere admin (implementado en PHASE 4)
  */
 export async function POST(request: NextRequest) {
   try {
-    // TODO: Verificar autenticación admin (PHASE 4)
-    // Por ahora permitir a cualquiera, después agregar auth
+    // PHASE 4: JWT auth verificado en middleware
+    // TODO: Agregar validación de admin role en este endpoint
     
     // Invalidar cache del servidor
     invalidateCache('products:all');

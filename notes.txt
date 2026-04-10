@@ -1,63 +1,21 @@
 ================================================================================
-SISTEMA DE PREVENTA - DIEZ PRODUCCIONES
+SISTEMA DE PREVENTA - SAAS - DIEZ PRODUCCIONES
 ================================================================================
 
-STATUS: v1.0.0-alpha.3 | Estado: ✅ FASE 4A-B COMPLETA | Corte de Revisión: 5 Abril 2026
-DB: Supabase PostgreSQL | Framework: Next.js 16 + React + Prisma 6
-PRÓXIMA ETAPA: PHASE 5 (Dashboards Analytics + Reportes)
+STATUS: v1.0.0-alpha.3 | Estado: ✅ FASE 4 COMPLETA + BD DEV LISTA | Corte: 9 Abril 2026
+DB: Supabase PostgreSQL (dev + prod separadas) | Framework: Next.js 16 + React + Prisma 6
+
+================================================================================
+⚠️ ARQUITECTURA DE BASE DE DATOS - IMPORTANTE
+================================================================================
 
 
+
+
+  
 ================================================================================
 📋 TODO - FUNCIONALIDADES DESCRITAS DE IMPLEMENTAR (FASE 5+)
 ================================================================================
-
-*** IMPORTANTE: Estas son características que YA ESTÁN DESCRITAS EN DOCUMENTO ***
-*** y pueden ser implementadas post-evento o en siguiente iteración ***
-
-TIER 1: ANALYTICS & REPORTING (FASE 5 - MEDIA PRIORIDAD)
-==========================================================
-[ ] Dashboard admin with revenue metrics
-    - Total revenue real-time
-    - Orders count (by status)
-    - Payment success rate (%)
-    - Peak hours analysis
-    - Product sales ranking
-    - Archivo: src/app/admin/analytics/page.tsx
-
-[ ] Export orders to CSV
-    - Filter by date range, status, customer
-    - Download link in admin
-    - Archivo: POST /api/admin/export/orders
-
-[ ] Daily/Weekly reports
-    - Email reporte al admin cada X horas
-    - Resumen: órdenes, ingresos, issues
-    - Archivo: src/lib/reports.ts + scheduled job
-
-[ ] Security audit logs viewer
-    - Filtrar por reason (fraud, rate_limit, etc)
-    - Timeline visual
-    - Export para análisis
-    - Archivo: src/app/admin/security-logs/page.tsx
-
-TIER 2: USER MANAGEMENT (FASE 5 - MEDIA PRIORIDAD)
-===================================================
-[ ] Create/Edit/Delete staff users
-    - Admin puede agregar más staff
-    - Edit email, role, active status
-    - Bulk import de CSV
-    - Archivo: src/app/admin/users/page.tsx + API
-
-[ ] User activity log
-    - Quién marcó qué entrega
-    - Cuándo login/logout
-    - Audit trail por usuario
-    - Archivo: Nuevo table ActivityLog en schema
-
-[ ] Role management (future-proof para roles dinámicos)
-    - Definir permisos custom por rol
-    - No hardcodear roles en código
-    - Archivo: Future iteration
 
 TIER 3: ENHANCED SECURITY (FASE 6 - BAJA PRIORIDAD POST-EVENTO)
 ===============================================================
@@ -110,45 +68,38 @@ TIER 5: OPERATIONAL (FASE 5 - MEDIA PRIORIDAD)
     - Multitenancy basado en evento
     - Archivo: Agregar eventId a Order/Product/User
 
-[ ] Inventory management dashboard
-    - Stock en tiempo real
-    - Low stock alerts
-    - Manual ajustes de stock
-    - Archivo: src/app/admin/inventory/page.tsx
-
 [ ] Refund/Cancellation workflow
     - Admin cancela orden → refund (vía transfer reversa)
     - Email customer de refund
     - Automatic bank transfer confirmation
     - Archivo: POST /api/orders/[code]/refund (REQUIRES BANK API)
 
-[ ] QR codes for orders
-    - Generar QR code per orden
-    - Staff escanea en evento → mark delivered
-    - Alternativa a buscar por código
-    - Archivo: src/lib/qr-generator.ts
 
-TIER 6: INTEGRATIONS (FUTURE - BAJA PRIORIDAD)
-==============================================
-[ ] Slack integration
-    - Notificaciones de órdenes a slack channel
-    - Alerts when problem detected
-    - Admin commands en Slack
-
-[ ] Shopify sync (si tienen store)
-    - Sincronizar producto inventory
-    - Cross-channel orders
-
-[ ] Payment gateway integration
+[ ] Integración con gateway de pago
     - Mercado Pago API
-    - Stripe
-    - PayPal
-    - (Currently manual transfer proof)
+    - (Actualmente proof de transferencia manual)
 
-[ ] CRM integration (HubSpot, Pipedrive, etc)
-    - Sync customer data
-    - Track conversions
-
+[ ] Integración CRM
+    - Explorar definición y casos de uso
+    - Sincronizar datos de clientes
+    - Tracking de conversiones
+    
+    Ventajas CRM:
+      • Centralizar data de clientes (nombre, email, teléfono, historial)
+      • Automatizar follow-up (emails post-evento, encuestas)
+      • Analytics: Customer lifetime value, retention rate
+      • Segmentación: Clientes por monto gastado, frecuencia
+      • Integración con email marketing (Mailchimp, SendGrid)
+      • Reportes automatizados de ventas
+    
+    Desventajas CRM:
+      • Complejidad operacional (aprender software CRM)
+      • Costo adicional (Salesforce, HubSpot, Pipedrive)
+      • Data privacy compliance (GDPR, CCPA)
+      • Sincronización manual o API errors
+      • Learning curve para team
+      • Overkill para evento pequeño (escalable a futuro)
+ 
 ================================================================================
 ✨ SUGERENCIAS ARQUITECTÓNICAS (XAI RECOMENDACIONES)
 ================================================================================
@@ -345,7 +296,7 @@ TIER 6: INTEGRATIONS (FUTURE - BAJA PRIORIDAD)
 
 STATUS: ✅ PRODUCCIÓN-READY PARA EVENTO
 
-El sistema está COMPLETO para el evento del 5 de Abril 2026.
+El sistema está COMPLETO para el evento del 24 de Abril 2026.
 
 Fases 1-4B implementadas exhaustivamente:
   ✓ Seguridad (validación, rate-limiting, XSS/SQL injection)
@@ -560,16 +511,3 @@ Problema: Login fallido
 Issue crítico:
 → Contact: Backend architect mode + database expert
 
-================================================================================
-EOF - UPDATED 5 ABRIL 2026 v1.0.0-alpha.2
-================================================================================
-
-SISTEMA LISTO PARA EVENTO 🚀
-
-✓ Compras públicas aseguradas
-✓ Staff authentication y despacho operativo
-✓ Rate limiting y anti-fraude funcionando
-✓ Security logging y auditoría completa
-✓ Performance optimizado para 500-1000 concurrentes
-
-Para iniciar: npm run dev

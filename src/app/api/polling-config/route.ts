@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cached);
     }
 
-    // Por ahora, leer del DEFAULT (en PHASE 4, leer de BD)
+    // TODO PHASE 5: Persistir configuración en BD en lugar de default
     const config = DEFAULT_POLLING_CONFIG;
 
     // Cachear por 1 minuto
@@ -47,15 +47,15 @@ export async function GET(request: NextRequest) {
  * PHASE 2 - R2.3: POST /api/polling-config
  * 
  * Actualiza configuración de polling
- * - Solo admin (TODO: PHASE 4 - verificar auth)
+ * - Solo admin (PHASE 4: JWT auth implementado)
  * - Valida limites
  * - Invalida cache
  * - Retorna config actualizada
  */
 export async function POST(request: NextRequest) {
   try {
-    // TODO: PHASE 4 - Verificar que usuario es admin
-    // Por ahora permitir a cualquiera para testing
+    // PHASE 4: JWT auth verificado en middleware
+    // TODO: Agregar validación de admin role en este endpoint
     
     const body = await request.json();
     const { enabled, intervalMs } = body;

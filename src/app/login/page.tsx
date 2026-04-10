@@ -136,23 +136,6 @@ export default function UnifiedLoginPage() {
             </button>
           </form>
         </div>
-
-        {/* Footer with test credentials */}
-        <div className="border-t border-slate-700 bg-slate-800/50 px-6 sm:px-8 py-6">
-          <p className="text-slate-400 text-xs font-semibold uppercase tracking-wide mb-4">
-            🔐 Credenciales de Prueba:
-          </p>
-          <div className="space-y-2 text-xs">
-            <div>
-              <p className="text-amber-400 font-semibold">👨‍💼 Administrador:</p>
-              <p className="text-slate-400">admin@preventa.local / admin123</p>
-            </div>
-            <div>
-              <p className="text-blue-400 font-semibold">👷 Personal Despacho:</p>
-              <p className="text-slate-400">staff1@preventa.local / staff123</p>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
